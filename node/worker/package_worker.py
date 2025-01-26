@@ -11,7 +11,7 @@ from pathlib import Path
 import sys
 import traceback
 from datetime import datetime
-from dotenv import load_dotenv
+from dotenv import load_dotenv, dotenv_values
 from typing import Union
 import sys
 
@@ -19,6 +19,7 @@ from node.module_manager import install_module_with_lock, load_and_validate_inpu
 from node.schemas import AgentRun, MemoryRun, ToolRun, EnvironmentRun, OrchestratorRun, KBRun
 from node.worker.main import app
 from node.worker.utils import prepare_input_dir, update_db_with_status_sync, upload_to_ipfs
+from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 
@@ -36,66 +37,90 @@ MODULES_SOURCE_DIR = root_dir / _MODULES_SOURCE_DIR
 if MODULES_SOURCE_DIR not in sys.path:
     sys.path.append(MODULES_SOURCE_DIR)
 
+@contextmanager
+def set_env_variables(env_vars):
+    dot_env_vars = dotenv_values(os.path.join(os.path.dirname(__file__), '../../.env'))
+    old_env = os.environ.copy()
+
+    try:
+        for key in dot_env_vars:
+            if key in os.environ:
+                os.environ[key] = ""
+
+        if env_vars:
+            os.environ.update(env_vars)
+        yield
+    except Exception as e:
+        logger.error(e)
+    finally:
+        os.environ.clear()
+        os.environ.update(old_env)
 
 @app.task(bind=True, acks_late=True)
-def run_agent(self, agent_run):
-    try:
-        agent_run = AgentRun(**agent_run)
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(_run_module_async(agent_run))
-    finally:
-        # Force cleanup of channels
-        app.backend.cleanup()
+def run_agent(self, agent_run, user_env_data = {}):
+    with set_env_variables(user_env_data):
+        try:
+            agent_run = AgentRun(**agent_run)
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(_run_module_async(agent_run))
+        finally:
+            # Force cleanup of channels
+            app.backend.cleanup()
 
 @app.task(bind=True, acks_late=True)
-def run_memory(self, memory_run):
-    try:
-        memory_run = MemoryRun(**memory_run)
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(_run_module_async(memory_run))
-    finally:
-        # Force cleanup of channels
-        app.backend.cleanup()
+def run_memory(self, memory_run, user_env_data = {}):
+    with set_env_variables(user_env_data):
+        try:
+            memory_run = MemoryRun(**memory_run)
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(_run_module_async(memory_run))
+        finally:
+            # Force cleanup of channels
+            app.backend.cleanup()
 
 @app.task(bind=True, acks_late=True)
-def run_tool(self, tool_run):
-    try:
-        tool_run = ToolRun(**tool_run)
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(_run_module_async(tool_run))
-    finally:
-        # Force cleanup of channels
-        app.backend.cleanup()
+def run_tool(self, tool_run, user_env_data = {}):
+    with set_env_variables(user_env_data):
+        try:
+            tool_run = ToolRun(**tool_run)
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(_run_module_async(tool_run))
+        finally:
+            # Force cleanup of channels
+            app.backend.cleanup()
 
 @app.task(bind=True, acks_late=True)
-def run_orchestrator(self, orchestrator_run):
-    try:
-        orchestrator_run = OrchestratorRun(**orchestrator_run)
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(_run_module_async(orchestrator_run))
-    finally:
-        # Force cleanup of channels
-        app.backend.cleanup()
+def run_orchestrator(self, orchestrator_run, user_env_data = {}):
+    with set_env_variables(user_env_data):
+        try:
+            orchestrator_run = OrchestratorRun(**orchestrator_run)
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(_run_module_async(orchestrator_run))
+        finally:
+            # Force cleanup of channels
+            app.backend.cleanup()
 
 @app.task(bind=True, acks_late=True)
-def run_environment(self, environment_run):
-    try:
-        environment_run = EnvironmentRun(**environment_run)
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(_run_module_async(environment_run))
-    finally:
-        # Force cleanup of channels
-        app.backend.cleanup()
+def run_environment(self, environment_run, user_env_data = {}):
+    with set_env_variables(user_env_data):
+        try:
+            environment_run = EnvironmentRun(**environment_run)
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(_run_module_async(environment_run))
+        finally:
+            # Force cleanup of channels
+            app.backend.cleanup()
 
 @app.task(bind=True, acks_late=True)
-def run_kb(self, kb_run):
-    try:
-        kb_run = KBRun(**kb_run)
-        loop = asyncio.get_event_loop()
-        return loop.run_until_complete(_run_module_async(kb_run))
-    finally:
-        # Force cleanup of channels
-        app.backend.cleanup()
+def run_kb(self, kb_run, user_env_data = {}):
+    with set_env_variables(user_env_data):
+        try:
+            kb_run = KBRun(**kb_run)
+            loop = asyncio.get_event_loop()
+            return loop.run_until_complete(_run_module_async(kb_run))
+        finally:
+            # Force cleanup of channels
+            app.backend.cleanup()
 
 async def _run_module_async(module_run: Union[AgentRun, MemoryRun, ToolRun, OrchestratorRun, EnvironmentRun, KBRun]) -> None:
     """Handles execution of agent, memory, orchestrator, and environment runs.

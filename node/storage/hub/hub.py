@@ -7,6 +7,8 @@ import os
 from surrealdb import Surreal
 import traceback
 from typing import Dict, List, Optional, Tuple
+from node.schemas import SecretInput
+from contextlib import asynccontextmanager
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -48,6 +50,16 @@ class HubDBSurreal(AsyncMixin):
         except jwt.PyJWTError as e:
             logger.error(f"Token decoding failed: {e}")
             return None
+        
+    @asynccontextmanager
+    async def root_user_context(self):
+        try:
+            # Sign in as root user
+            await self.surrealdb.signin({"user": "root", "pass": "root"})
+            yield
+        finally:
+            logger.info("Signing out from root user")
+            await self.close()
 
     async def signin(
         self, username: str, password: str
@@ -251,6 +263,56 @@ class HubDBSurreal(AsyncMixin):
     async def create_agent(self, agent_config: Dict) -> Tuple[bool, Optional[Dict]]:
         return await self.surrealdb.create("agent", agent_config)
 
+    def prepare_batch_query(self, secret_config: List[SecretInput], existing_data: List, update:bool = False) -> str:
+        existing_data_dict = {secret['key_name'] for secret in existing_data if 'key_name' in secret}
+        records_to_insert = []
+        records_to_update = []
+        
+        for secret in secret_config:
+            user_id = secret.user_id
+            key_name = secret.key_name
+            key_value = secret.secret_value
+
+            if not existing_data_dict or key_name not in existing_data_dict:
+                records_to_insert.append(f'{{"user_id": {user_id}, "key_name": "{key_name}", "secret_value": "{key_value}"}}')
+            else:
+                if update:
+                    records_to_update.append(
+                        {"secret_value": key_value, "user_id": user_id, "key_name": key_name}
+                    )
+
+        insert_query = ""
+        if records_to_insert:
+            insert_query = f"INSERT INTO api_secrets [{', '.join(records_to_insert)}];"
+
+        update_query = ""
+        if records_to_update:
+            for record in records_to_update:
+                update_query += f"UPDATE api_secrets SET secret_value='{record['secret_value']}' WHERE user_id={record['user_id']} AND key_name='{record['key_name']}';\n"
+
+        final_query = f"{insert_query}\n{update_query}".strip()
+
+        return final_query
+    
+    async def create_secret(self, secret_config: List[SecretInput], update: bool = False) -> str:
+        existing_data = await self.get_user_secrets(secret_config[0].user_id.replace("<record>", ""))
+        final_query = self.prepare_batch_query(secret_config, existing_data, update)
+
+        if final_query:
+            async with self.root_user_context():
+                result = await self.surrealdb.query(final_query)
+                return "Records updated successfully" if result[0]['status'] == 'OK' else "Something went wrong"
+        else:
+            return "Records already exists"
+
+    async def get_user_secrets(self, user_id: str) -> str:
+        async with self.root_user_context():
+            result = await self.surrealdb.query(
+                "SELECT key_name, secret_value FROM api_secrets WHERE user_id=$user_id", {
+                    'user_id': user_id
+            })
+            return result[0]['result']
+    
     async def close(self):
         """Close the database connection"""
         if self.is_authenticated:

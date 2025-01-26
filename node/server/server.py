@@ -11,6 +11,7 @@ from node.server.http_server import HTTPServer
 from node.server.ws_server import WebSocketServer
 from node.server.grpc_server import GrpcServer
 from node.utils import get_logger, get_node_config
+from node.secret import Secret
 
 logger = get_logger(__name__)
 load_dotenv()
@@ -271,6 +272,14 @@ if __name__ == "__main__":
     )
     
     args = parser.parse_args()
+
+    server_private_key_path = os.path.join(os.path.dirname(__file__), '../../private_key.pem')
+    server_public_key_path = os.path.join(os.path.dirname(__file__), '../../public_key.pem')
+    env_file_path = os.path.join(os.path.dirname(__file__), '../../.env')
+
+    secret = Secret(server_private_key_path, server_public_key_path, env_file_path)
+    secret.check_and_generate_keys()
+    secret.check_and_generate_aes_secret()
 
     asyncio.run(run_server(
         communication_protocol=args.communication_protocol,

@@ -501,3 +501,8 @@ class CompletionRequest(BaseModel):
 class EmbeddingsRequest(BaseModel):
     model: str
     input: Union[str, List[str]]
+    
+class SecretInput(BaseModel):
+    user_id: str
+    secret_value: str
+    key_name: str
