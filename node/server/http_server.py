@@ -50,7 +50,6 @@ from node.client import Node as NodeClient
 from node.storage.server import router as storage_router
 from node.inference.server import router as inference_router
 from node.secret import Secret
-from contextlib import contextmanager
 
 logger = logging.getLogger(__name__)
 load_dotenv()
@@ -463,43 +462,42 @@ class HTTPServer:
                     decrypted_value = secret.decrypt_with_aes(record["secret_value"], base64.b64decode(os.getenv("AES_SECRET")))
                     user_env_data[record["key_name"]] = decrypted_value
 
-            with set_env_variables():
-                # Create module run record in DB
-                async with LocalDBPostgres() as db:
-                    module_run = await create_func(db)(module_run_input)
-                    if not module_run:
-                        raise HTTPException(status_code=500, detail=f"Failed to create {module_type} run")
-                    module_run_data = module_run.model_dump()
+            # Create module run record in DB
+            async with LocalDBPostgres() as db:
+                module_run = await create_func(db)(module_run_input)
+                if not module_run:
+                    raise HTTPException(status_code=500, detail=f"Failed to create {module_type} run")
+                module_run_data = module_run.model_dump()
 
-                    logger.info(f"{module_type.capitalize()} run data: {module_run_data}")
+                logger.info(f"{module_type.capitalize()} run data: {module_run_data}")
 
-                await self.register_user_on_worker_nodes(module_run)
+            await self.register_user_on_worker_nodes(module_run)
 
-                # Execute the task based on module type
-                if module_run_input.deployment.module.execution_type == ModuleExecutionType.package:
-                    if module_type == "agent":
-                        _ = run_agent.delay(module_run_data, user_env_data)
-                    elif module_type == "tool":
-                        _ = run_tool.delay(module_run_data, user_env_data)
-                    elif module_type == "orchestrator":
-                        _ = run_orchestrator.delay(module_run_data, user_env_data)
-                    elif module_type == "environment":
-                        _ = run_environment.delay(module_run_data, user_env_data)
-                    elif module_type == "kb":
-                        _ = run_kb.delay(module_run_data, user_env_data)
-                    elif module_type == "memory":
-                        _ = run_memory.delay(module_run_data, user_env_data)                   
-                elif module_run_input.deployment.module.execution_type == ModuleExecutionType.docker and module_type == "agent":
-                    # validate docker params
-                    try:
-                        _ = DockerParams(**module_run_data["inputs"])
-                    except Exception as e:
-                        raise HTTPException(status_code=400, detail=f"Invalid docker params: {str(e)}")
-                    _ = execute_docker_agent.delay(module_run_data)
-                else:
-                    raise HTTPException(status_code=400, detail=f"Invalid {module_type} run type")
+            # Execute the task based on module type
+            if module_run_input.deployment.module.execution_type == ModuleExecutionType.package:
+                if module_type == "agent":
+                    _ = run_agent.delay(module_run_data, user_env_data)
+                elif module_type == "tool":
+                    _ = run_tool.delay(module_run_data, user_env_data)
+                elif module_type == "orchestrator":
+                    _ = run_orchestrator.delay(module_run_data, user_env_data)
+                elif module_type == "environment":
+                    _ = run_environment.delay(module_run_data, user_env_data)
+                elif module_type == "kb":
+                    _ = run_kb.delay(module_run_data, user_env_data)
+                elif module_type == "memory":
+                    _ = run_memory.delay(module_run_data, user_env_data)                   
+            elif module_run_input.deployment.module.execution_type == ModuleExecutionType.docker and module_type == "agent":
+                # validate docker params
+                try:
+                    _ = DockerParams(**module_run_data["inputs"])
+                except Exception as e:
+                    raise HTTPException(status_code=400, detail=f"Invalid docker params: {str(e)}")
+                _ = execute_docker_agent.delay(module_run_data)
+            else:
+                raise HTTPException(status_code=400, detail=f"Invalid {module_type} run type")
 
-                return module_run_data
+            return module_run_data
         
         except HTTPException as e:
             logger.error(f"Error: {str(e.detail)}")

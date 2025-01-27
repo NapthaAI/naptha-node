@@ -55,7 +55,7 @@ class HubDBSurreal(AsyncMixin):
     async def root_user_context(self):
         try:
             # Sign in as root user
-            await self.surrealdb.signin({"user": "root", "pass": "root"})
+            await self.surrealdb.signin({"user": os.getenv("HUB_DB_SURREAL_ROOT_USER"), "pass": os.getenv("HUB_DB_SURREAL_ROOT_PASS")})
             yield
         finally:
             logger.info("Signing out from root user")
