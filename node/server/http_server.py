@@ -311,7 +311,15 @@ class HTTPServer:
             return response
         
         @router.post("/user/secret/create")
-        async def user_secret_create_endpoint(secrets: List[SecretInput], is_update: Optional[bool] = Query(False)):
+        async def user_secret_create_endpoint(secrets: List[SecretInput], signature: str, is_update: Optional[bool] = Query(False)):
+            user_id = secrets[0].user_id.replace("<record>", "") if secrets else ""
+
+            if not user_id:
+                raise HTTPException(status_code=400, detail=f"Data cannot be empty")
+            
+            if not verify_signature(user_id, signature, user_id.split(":")[1]):
+                raise HTTPException(status_code=401, detail="Unauthorized: Invalid signature")
+            
             try:
                 aes_secret = base64.b64decode(os.getenv("AES_SECRET"))
                 for data in secrets:
