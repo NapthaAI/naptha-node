@@ -81,10 +81,18 @@ class Secret:
         logger.info("RSA keys loaded from files.")
 
     def get_public_key(self):
-        return self.public_key.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
-        ).decode()
+        public_numbers = self.public_key.public_numbers()
+
+        # Using a fixed `kid` that stays the same for this key
+        jwk = {
+            "kty": "RSA",
+            "kid": "server-key",
+            "use": "enc",
+            "n": self._encode_base64_url(public_numbers.n),
+            "e": self._encode_base64_url(public_numbers.e),
+        }
+
+        return jwk
 
     def check_and_generate_aes_secret(self):
         if not self._aes_secret_exists():
@@ -151,3 +159,7 @@ class Secret:
     def save_to_env(self, key, value):
         with open(self.env_file, "a") as f:
             f.write(f"{key}={value}\n")
+
+    def _encode_base64_url(self, value: int) -> str:
+        encoded = base64.urlsafe_b64encode(value.to_bytes((value.bit_length() + 7) // 8, byteorder='big'))
+        return encoded.decode('utf-8').rstrip("=")

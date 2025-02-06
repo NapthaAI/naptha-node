@@ -122,12 +122,12 @@ class HTTPServer:
                 }
             )
         
-        @router.get("/public_key")
+        @router.get("/.well-known/jwks.json")
         async def get_public_key():
             try:
-                public_key = self.secret.get_public_key()
+                jwk = self.secret.get_public_key()
 
-                return {"public_key" : public_key}
+                return {"keys" : [jwk]}
             except Exception as e:
                 return {"error": f"Error retrieving public key: {str(e)}"}
 
