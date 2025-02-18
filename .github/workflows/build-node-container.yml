@@ -17,8 +17,8 @@ jobs:
       HUB_URL: ws://localhost:3001/rpc
       NODE_URL: http://localhost:7001
       NAPTHA_HUB_USERNAME: test_user
-      NAPTHA_HUB_PVT_KEY: ${{ secrets.NAPTHA_HUB_PVT_KEY }}
-      NAPTHA_HUB_PASSWORD: ${{ secrets.NAPTHA_HUB_PASSWORD }}
+      NAPTHA_HUB_PVT_KEY: a5141246773dc97480b376369da8215fd04d654a46bd3b1815c9913b1c2572d9
+      NAPTHA_HUB_PASSWORD: test_password
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
