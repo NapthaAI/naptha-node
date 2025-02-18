@@ -50,6 +50,9 @@ jobs:
 
 
 
+        - name: Install SDK dependencies
+          run: |
+            ls -l
 
         - name: Checkout SDK repo
           uses: actions/checkout@v4
@@ -57,9 +60,7 @@ jobs:
             repository: NapthaAI/naptha-sdk
             fetch-depth: 1
         
-        - name: Install SDK dependencies
-          run: |
-            ls -l
+        
             
 
         # - name: Install SDK dependencies
