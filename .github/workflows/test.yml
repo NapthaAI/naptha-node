@@ -56,20 +56,6 @@ jobs:
             fetch-depth: 1
             path: $GITHUB_WORKSPACE/sdk-dir
         
-          
-        - name: check
-          working-directory: $GITHUB_WORKSPACE/
-          run: |
-            pwd
-            ls -l
-            ls -l sdk-dir
-    
-        - name: Install SDK dependencies
-          working-directory: $GITHUB_WORKSPACE/sdk-dir
-          run: |
-            poetry lock
-            poetry install
-        
         - name: Set up SDK env variables
           env: 
             NAPTHA_HUB_USERNAME: ${{ vars.NAPTHA_HUB_USERNAME }}
@@ -94,4 +80,8 @@ jobs:
         - name: Install SDK dependencies
           working-directory: $GITHUB_WORKSPACE/sdk-dir
           run: |
+            poetry lock
+            poetry install
+
+            
             pytest -v tests/test_cli.py
