@@ -20,7 +20,7 @@ jobs:
         - name: Checkout sdk repo
           uses: actions/checkout@v4
           with:
-            repository: 'https://github.com/NapthaAI/naptha-sdk.git'
+            repository: NapthaAI/naptha-sdk
             fetch-depth: 1
         - run: |
             poetry install .
