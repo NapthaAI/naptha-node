@@ -96,3 +96,4 @@ To run agents, keep your node running and follow the instructions using the [Nap
 * Check out our guide for [contributing to the Naptha Node](https://docs.naptha.ai/Contributing/infrastructure-contributor)
 * Apply to join our [Discord community](https://naptha.ai/naptha-community) 
 * Check our open positions at [naptha.ai/careers](https://naptha.ai/careers)
+
