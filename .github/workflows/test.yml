@@ -18,7 +18,7 @@ jobs:
           uses: actions/checkout@v4
           with:
             fetch-depth: 1
-            path: node-dir
+            path: $HOME/node-dir
 
         - name: Set up NODE env variables
           env: 
@@ -58,7 +58,7 @@ jobs:
           with:
             repository: NapthaAI/naptha-sdk
             fetch-depth: 1
-            path: sdk-dir
+            path: $HOME/sdk-dir
         
         
             
