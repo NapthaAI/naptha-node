@@ -14,9 +14,9 @@ jobs:
   build-only:
     runs-on: ubuntu-latest
     env:
-      HUB_URL: wss://hub.naptha.ai/rpc
+      HUB_URL: ws://localhost:3001/rpc
       NODE_URL: http://localhost:7001
-      NAPTHA_HUB_USERNAME: ${{ secrets.NAPTHA_HUB_USERNAME }}
+      NAPTHA_HUB_USERNAME: test_user
       NAPTHA_HUB_PVT_KEY: ${{ secrets.NAPTHA_HUB_PVT_KEY }}
       NAPTHA_HUB_PASSWORD: ${{ secrets.NAPTHA_HUB_PASSWORD }}
     steps:
@@ -35,11 +35,12 @@ jobs:
         run: |
           cp .env.example .env
           sed -i 's/^LAUNCH_DOCKER=.*/LAUNCH_DOCKER=true/' .env
-          echo "LOCAL_HUB=true" >> .env
-          echo "REGISTER_NODE_WITH_HUB=false" >> .env
-          echo "OLLAMA_MODELS=" >> .env
-          echo "VLLM_MODELS=" >> .env
-          echo "OPENAI_MODELS=" >> .env
+          sed -i 's/^NODE_IP=.*/NODE_IP=127.0.0.1/' .env
+          sed -i 's/^LOCAL_HUB=.*/LOCAL_HUB=true/' .env
+          sed -i 's/^REGISTER_NODE_WITH_HUB=.*/REGISTER_NODE_WITH_HUB=true/' .env
+          sed -i 's/^OLLAMA_MODELS=.*/OLLAMA_MODELS=""/' .env
+          sed -i 's/^VLLM_MODELS=.*/VLLM_MODELS=""/' .env
+          sed -i 's/^OPENAI_MODELS=.*/OPENAI_MODELS=""/' .env
 
           echo "Creating PEM file for user: $NAPTHA_HUB_USERNAME"
           PEM_FILE="$NAPTHA_HUB_USERNAME.pem"
