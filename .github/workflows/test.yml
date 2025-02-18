@@ -18,30 +18,12 @@ jobs:
           uses: actions/checkout@v4
           with:
             fetch-depth: 1
-            path: $GITHUB_WORKSPACE/node-dir
-        
-        - name: Checkout SDK repo
-          uses: actions/checkout@v4
-          with:
-            repository: NapthaAI/naptha-sdk
-            fetch-depth: 1
-            path: $GITHUB_WORKSPACE/sdk-dir
-        
-        - name: check
-          working-directory: $GITHUB_WORKSPACE/
-          run: |
-            pwd
-            ls -l
-            ls -l node-dir
-            ls -l sdk-dir
-
 
         - name: Set up NODE env variables
           env: 
             NAPTHA_HUB_USERNAME: ${{ vars.NAPTHA_HUB_USERNAME }}
             NAPTHA_HUB_PVT_KEY: ${{ secrets.NAPTHA_HUB_PVT_KEY }}
             NAPTHA_HUB_PASSWORD: ${{ secrets.NAPTHA_HUB_PASSWORD }}
-          working-directory: $GITHUB_WORKSPACE/node-dir
           run: |
             cp .env.example .env
         
@@ -61,20 +43,28 @@ jobs:
             echo "HUB_PASSWORD=${NAPTHA_HUB_PASSWORD}" >> .env
 
         - name: Install node
-          working-directory: $GITHUB_WORKSPACE/node-dir
           run: bash launch.sh
         
         - name: Install Poetry for SDK
           uses: snok/install-poetry@v1
 
 
-        # - name: Checkout SDK repo
-        #   uses: actions/checkout@v4
-        #   with:
-        #     repository: NapthaAI/naptha-sdk
-        #     fetch-depth: 1
-        #     path: $GITHUB_WORKSPACE/sdk-dir
+        - name: Checkout SDK repo
+          uses: actions/checkout@v4
+          with:
+            repository: NapthaAI/naptha-sdk
+            fetch-depth: 1
+            path: $GITHUB_WORKSPACE/sdk-dir
         
+          
+        - name: check
+          working-directory: $GITHUB_WORKSPACE/
+          run: |
+            pwd
+            ls -l
+            ls -l node-dir
+            ls -l sdk-dir
+    
         
             
 
