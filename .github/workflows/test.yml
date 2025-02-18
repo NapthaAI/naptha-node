@@ -62,40 +62,36 @@ jobs:
           run: |
             pwd
             ls -l
-            ls -l node-dir
             ls -l sdk-dir
     
+        - name: Install SDK dependencies
+          working-directory: $GITHUB_WORKSPACE/sdk-dir
+          run: |
+            poetry lock
+            poetry install
         
+        - name: Set up SDK env variables
+          env: 
+            NAPTHA_HUB_USERNAME: ${{ vars.NAPTHA_HUB_USERNAME }}
+            NAPTHA_HUB_PVT_KEY: ${{ secrets.NAPTHA_HUB_PVT_KEY }}
+            NAPTHA_HUB_PASSWORD: ${{ secrets.NAPTHA_HUB_PASSWORD }}
+          working-directory: $GITHUB_WORKSPACE/sdk-dir
+          run: |
+            cp .env.example .env
+        
+            # override defaults
+            echo -e "\n" >> .env
+            echo "LOCAL_HUB=true" >> .env
+            echo "HUB_URL=ws://localhost:3001/rpc" >> .env
+            echo "NODE_URL=http://localhost:7001" >> .env
             
-
-        # - name: Install SDK dependencies
-        #   working-directory: $GITHUB_WORKSPACE/sdk-dir
-        #   run: |
-        #     poetry lock
-        #     poetry install
+            # set dummy user
+            echo "${NAPTHA_HUB_PVT_KEY}" > "${NAPTHA_HUB_USERNAME}.pem"
+            echo "PRIVATE_KEY=${NAPTHA_HUB_USERNAME}.pem" >> .env
+            echo "HUB_USERNAME=${NAPTHA_HUB_USERNAME}" >> .env
+            echo "HUB_PASSWORD=${NAPTHA_HUB_PASSWORD}" >> .env
         
-        # - name: Set up SDK env variables
-        #   env: 
-        #     NAPTHA_HUB_USERNAME: ${{ vars.NAPTHA_HUB_USERNAME }}
-        #     NAPTHA_HUB_PVT_KEY: ${{ secrets.NAPTHA_HUB_PVT_KEY }}
-        #     NAPTHA_HUB_PASSWORD: ${{ secrets.NAPTHA_HUB_PASSWORD }}
-        #   working-directory: $GITHUB_WORKSPACE/sdk-dir
-        #   run: |
-        #     cp .env.example .env
-        
-        #     # override defaults
-        #     echo -e "\n" >> .env
-        #     echo "LOCAL_HUB=true" >> .env
-        #     echo "HUB_URL=ws://localhost:3001/rpc" >> .env
-        #     echo "NODE_URL=http://localhost:7001" >> .env
-            
-        #     # set dummy user
-        #     echo "${NAPTHA_HUB_PVT_KEY}" > "${NAPTHA_HUB_USERNAME}.pem"
-        #     echo "PRIVATE_KEY=${NAPTHA_HUB_USERNAME}.pem" >> .env
-        #     echo "HUB_USERNAME=${NAPTHA_HUB_USERNAME}" >> .env
-        #     echo "HUB_PASSWORD=${NAPTHA_HUB_PASSWORD}" >> .env
-        
-        # - name: Install SDK dependencies
-        #   working-directory: $GITHUB_WORKSPACE/sdk-dir
-        #   run: |
-        #     pytest -v tests/test_cli.py
+        - name: Install SDK dependencies
+          working-directory: $GITHUB_WORKSPACE/sdk-dir
+          run: |
+            pytest -v tests/test_cli.py
