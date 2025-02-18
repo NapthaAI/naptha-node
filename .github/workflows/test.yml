@@ -23,7 +23,7 @@ jobs:
             repository: NapthaAI/naptha-sdk
             fetch-depth: 1
         - run: |
-            poetry install .
+            poetry install
 
     #   - name: Checkout code
     #     uses: actions/checkout@v4
