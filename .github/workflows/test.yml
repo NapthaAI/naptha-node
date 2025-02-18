@@ -42,8 +42,8 @@ jobs:
             echo "HUB_USERNAME=${NAPTHA_HUB_USERNAME}" >> .env
             echo "HUB_PASSWORD=${NAPTHA_HUB_PASSWORD}" >> .env
 
-        - name: Install node
-          run: bash launch.sh
+        # - name: Install node
+        #   run: bash launch.sh
         
         - name: Install Poetry for SDK
           uses: snok/install-poetry@v1
