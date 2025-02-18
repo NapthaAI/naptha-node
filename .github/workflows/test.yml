@@ -1,0 +1,55 @@
+name: Test SDK
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  launch-node:
+    runs-on: ubuntu-latest
+    environment: development
+          
+    steps:
+        - name: Install Poetry
+          uses: snok/install-poetry@v1
+
+        - name: Checkout sdk repo
+          uses: actions/checkout@v4
+          with:
+            repository: 'https://github.com/NapthaAI/naptha-sdk.git'
+            fetch-depth: 1
+        - run: |
+            poetry install .
+
+    #   - name: Checkout code
+    #     uses: actions/checkout@v4
+      
+    #   - name: Set up env variables
+    #     env: 
+    #       NAPTHA_HUB_USERNAME: ${{ vars.NAPTHA_HUB_USERNAME }}
+    #       NAPTHA_HUB_PVT_KEY: ${{ secrets.NAPTHA_HUB_PVT_KEY }}
+    #       NAPTHA_HUB_PASSWORD: ${{ secrets.NAPTHA_HUB_PASSWORD }}
+    #     run: |
+    #       cp .env.example .env
+      
+    #       # override defaults
+    #       echo -e "\n" >> .env
+    #       echo "LOCAL_HUB=true" >> .env
+          
+    #       # avoid downloading large models
+    #       echo "OLLAMA_MODELS=" >> .env
+    #       echo "VLLM_MODELS=" >> .env
+    #       echo "OPENAI_MODELS=" >> .env
+          
+    #       # set dummy user
+    #       echo "${NAPTHA_HUB_PVT_KEY}" > "${NAPTHA_HUB_USERNAME}.pem"
+    #       echo "PRIVATE_KEY=${NAPTHA_HUB_USERNAME}.pem" >> .env
+    #       echo "HUB_USERNAME=${NAPTHA_HUB_USERNAME}" >> .env
+    #       echo "HUB_PASSWORD=${NAPTHA_HUB_PASSWORD}" >> .env
+
+    #   - name: Install node
+    #     run: bash launch.sh
