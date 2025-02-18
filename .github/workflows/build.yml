@@ -1,47 +1,47 @@
-name: Install and launch node
+# name: Install and launch node
 
-on:
-  pull_request:
-    branches:
-      - main
-  push:
-    branches:
-      - main
+# on:
+#   pull_request:
+#     branches:
+#       - main
+#   push:
+#     branches:
+#       - main
 
-jobs:
-  launch-node:
-    runs-on: ${{ matrix.os }}
-    environment: development
-    strategy:
-      matrix:
-          os: [ubuntu-latest, macos-14]
+# jobs:
+#   launch-node:
+#     runs-on: ${{ matrix.os }}
+#     environment: development
+#     strategy:
+#       matrix:
+#           os: [ubuntu-latest, macos-14]
           
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+#     steps:
+#       - name: Checkout code
+#         uses: actions/checkout@v4
       
-      - name: Set up env variables
-        env: 
-          NAPTHA_HUB_USERNAME: ${{ vars.NAPTHA_HUB_USERNAME }}
-          NAPTHA_HUB_PVT_KEY: ${{ secrets.NAPTHA_HUB_PVT_KEY }}
-          NAPTHA_HUB_PASSWORD: ${{ secrets.NAPTHA_HUB_PASSWORD }}
-        run: |
-          cp .env.example .env
+#       - name: Set up env variables
+#         env: 
+#           NAPTHA_HUB_USERNAME: ${{ vars.NAPTHA_HUB_USERNAME }}
+#           NAPTHA_HUB_PVT_KEY: ${{ secrets.NAPTHA_HUB_PVT_KEY }}
+#           NAPTHA_HUB_PASSWORD: ${{ secrets.NAPTHA_HUB_PASSWORD }}
+#         run: |
+#           cp .env.example .env
       
-          # override defaults
-          echo -e "\n" >> .env
-          echo "LOCAL_HUB=true" >> .env
+#           # override defaults
+#           echo -e "\n" >> .env
+#           echo "LOCAL_HUB=true" >> .env
           
-          # avoid downloading large models
-          echo "OLLAMA_MODELS=" >> .env
-          echo "VLLM_MODELS=" >> .env
-          echo "OPENAI_MODELS=" >> .env
+#           # avoid downloading large models
+#           echo "OLLAMA_MODELS=" >> .env
+#           echo "VLLM_MODELS=" >> .env
+#           echo "OPENAI_MODELS=" >> .env
           
-          # set dummy user
-          echo "${NAPTHA_HUB_PVT_KEY}" > "${NAPTHA_HUB_USERNAME}.pem"
-          echo "PRIVATE_KEY=${NAPTHA_HUB_USERNAME}.pem" >> .env
-          echo "HUB_USERNAME=${NAPTHA_HUB_USERNAME}" >> .env
-          echo "HUB_PASSWORD=${NAPTHA_HUB_PASSWORD}" >> .env
+#           # set dummy user
+#           echo "${NAPTHA_HUB_PVT_KEY}" > "${NAPTHA_HUB_USERNAME}.pem"
+#           echo "PRIVATE_KEY=${NAPTHA_HUB_USERNAME}.pem" >> .env
+#           echo "HUB_USERNAME=${NAPTHA_HUB_USERNAME}" >> .env
+#           echo "HUB_PASSWORD=${NAPTHA_HUB_PASSWORD}" >> .env
 
-      - name: Install node
-        run: bash launch.sh
+#       - name: Install node
+#         run: bash launch.sh
