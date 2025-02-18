@@ -82,6 +82,9 @@ jobs:
           run: |
             poetry lock
             poetry install
-
+        
+        - name: Run SDK tests
+          working-directory: $GITHUB_WORKSPACE/sdk-dir
+          run: |  
+            poetry run pytest -v tests/test_cli.py
             
-            pytest -v tests/test_cli.py
