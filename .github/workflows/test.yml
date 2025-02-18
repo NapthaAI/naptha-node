@@ -29,7 +29,10 @@ jobs:
         
         - name: check
           working-directory: $GITHUB_WORKSPACE/
-          run: ls -l
+          run: |
+            ls -l
+            ls -l node-dir
+            ls -l sdk-dir
 
         # - name: Set up NODE env variables
         #   env: 
