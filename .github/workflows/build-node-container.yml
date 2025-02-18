@@ -4,14 +4,6 @@ on:
   push:
     branches:
       - main
-      - k-mistele/add-compose-configurations
-    paths:
-      - 'Dockerfile-node'
-      - 'node/**'
-      - '.github/**'
-      - '!docker-compose*'
-      - 'poetry.lock'
-      - 'pyproject.toml'
 
 jobs:
   build-and-push:
