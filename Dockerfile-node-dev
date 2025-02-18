@@ -35,11 +35,6 @@ RUN curl -sSf https://install.surrealdb.com | sh
 
 EXPOSE 7001 7002
 
-# run db migrations / config & server
-CMD (poetry run python -m node.storage.db.init_db | tee /dev/stdout) && \
-    (poetry run python -m node.storage.hub.init_hub | tee /dev/stdout) && \
-    (poetry run python -m node.storage.hub.init_hub --user | tee /dev/stdout) && \
-    ((poetry run celery -A node.worker.main:app worker --loglevel=info | tee /dev/stdout) & ) && \
-    (poetry run python -m node.server.server --communication-protocol http --port 7001 | tee /dev/stdout) & \
-    poetry run python -m node.server.server --communication-protocol ws --port 7002 | tee /dev/stdout
+RUN chmod +x /app/entrypoint.sh
+CMD ["/app/entrypoint.sh"]
 

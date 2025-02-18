@@ -51,6 +51,8 @@ services:
     container_name: node-app
     build:
       dockerfile: Dockerfile-node-dev
+    init: true
+    stop_grace_period: 30s
     env_file:
       - ./.env
     volumes:
