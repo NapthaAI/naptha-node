@@ -70,8 +70,8 @@ jobs:
 
       - name: Test Naptha SDK
         env:
-          HUB_USERNAME: ${{ secrets.NAPTHA_HUB_USERNAME }}
-          HUB_PASSWORD: ${{ secrets.NAPTHA_HUB_PASSWORD }}
+          HUB_USERNAME: test_user
+          HUB_PASSWORD: test_password
           NODE_URL: http://localhost:7001
           HUB_URL: ws://localhost:3001/rpc
         run: |
