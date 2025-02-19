@@ -2,9 +2,9 @@ import os
 import base64
 import logging
 from cryptography.hazmat.primitives.asymmetric import rsa, padding as asymmetric_padding
-from cryptography.hazmat.primitives import serialization, hashes, padding
+from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 
 logger = logging.getLogger(__name__)
 
@@ -131,34 +131,38 @@ class Secret:
 
         return decrypted_message.decode('utf-8')
 
-    def encrypt_with_aes(self, data: str, aes_key: bytes):
-        iv = os.urandom(16)
-        padder = padding.PKCS7(128).padder()  # 128 bits = 16 bytes
-        padded_data = padder.update(data.encode()) + padder.finalize()
+    def encrypt_with_aes(self, data: str, aes_key: bytes) -> str:
+        """ Encrypt data using AES-GCM."""
+        try:
+            aesgcm = AESGCM(aes_key)
+            nonce = os.urandom(12)
+            data_bytes = data.encode('utf-8')
+            ciphertext = aesgcm.encrypt(nonce, data_bytes, None)
+            encrypted_data = nonce + ciphertext
+            
+            return base64.b64encode(encrypted_data).decode('utf-8')
+        except Exception as e:
+            logger.error(f"Encryption failed: {str(e)}")
+            raise
 
-        cipher = Cipher(algorithms.AES(aes_key), modes.CBC(iv), backend=default_backend())
-        encryptor = cipher.encryptor()
-        encrypted_data = encryptor.update(padded_data) + encryptor.finalize()
-
-        return base64.b64encode(iv + encrypted_data).decode()
-
-    def decrypt_with_aes(self, encrypted_data: str, aes_key: bytes):
-        encrypted_data = base64.b64decode(encrypted_data)
-        iv = encrypted_data[:16]
-        encrypted_message = encrypted_data[16:]
-        cipher = Cipher(algorithms.AES(aes_key), modes.CBC(iv), backend=default_backend())
-
-        decryptor = cipher.decryptor()
-        decrypted_data = decryptor.update(encrypted_message) + decryptor.finalize()
-        
-        unpadder = padding.PKCS7(128).unpadder()
-        original_data = unpadder.update(decrypted_data) + unpadder.finalize()
-
-        return original_data.decode() 
+    def decrypt_with_aes(self, encrypted_data: str, aes_key: bytes) -> str:
+        """ Decrypt data using AES-GCM."""
+        try:
+            encrypted_bytes = base64.b64decode(encrypted_data)
+            nonce = encrypted_bytes[:12]
+            ciphertext = encrypted_bytes[12:]
+            
+            aesgcm = AESGCM(aes_key)
+            decrypted_data = aesgcm.decrypt(nonce, ciphertext, None)
+            
+            return decrypted_data.decode('utf-8')
+        except Exception as e:
+            logger.error(f"Decryption failed (possible tampering): {str(e)}")
+            raise
 
     def save_to_env(self, key, value):
         with open(self.env_file, "a") as f:
-            f.write(f"{key}={value}\n")
+            f.write(f"\n{key}={value}\n")
 
     def _encode_base64_url(self, value: int) -> str:
         encoded = base64.urlsafe_b64encode(value.to_bytes((value.bit_length() + 7) // 8, byteorder='big'))

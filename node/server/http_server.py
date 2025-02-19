@@ -45,7 +45,7 @@ from node.storage.db.db import LocalDBPostgres
 from node.storage.hub.hub import HubDBSurreal
 from node.user import check_user, register_user, get_user_public_key, verify_signature
 from node.worker.docker_worker import execute_docker_agent
-from node.worker.package_worker import run_agent, run_tool, run_environment, run_orchestrator, run_kb, run_memory, set_env_variables
+from node.worker.package_worker import run_agent, run_tool, run_environment, run_orchestrator, run_kb, run_memory
 from node.client import Node as NodeClient
 from node.storage.server import router as storage_router
 from node.inference.server import router as inference_router
@@ -63,24 +63,6 @@ LITELLM_URL = "http://litellm:4000" if os.getenv("LAUNCH_DOCKER") == "true" else
 
 if not LITELLM_MASTER_KEY:
     raise Exception("Missing LITELLM_MASTER_KEY for authentication")
-
-@contextmanager
-def set_env_variables():
-    dot_env_vars = dotenv_values(os.path.join(os.path.dirname(__file__), '../../.env'))
-    old_env = os.environ.copy()
-
-    try:
-        # Empty any environment variables that come from the .env file
-        for key in dot_env_vars:
-            if key in os.environ:
-                os.environ[key] = ""
-        yield
-    except Exception as e:
-        logger.error(e)
-    finally:
-        # Restore the original environment variables after exiting the context
-        os.environ.clear()
-        os.environ.update(old_env)
 
 
 class TransientDatabaseError(Exception):
