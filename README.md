@@ -88,7 +88,7 @@ For more details on ensuring the node launched successfully, checking the logs a
 
 To run agents, keep your node running and follow the instructions using the [Naptha SDK](https://github.com/NapthaAI/naptha-sdk). In the SDK repo, you should set the NODE_URL to the URL of your local node (default is http://localhost:7001).
 
-<img src="images/naptha-nodes.png" width="100%">
+<img src="docs/images/naptha-nodes.png" width="100%">
 
 
 ## Become a contributor to the Naptha Node
@@ -96,4 +96,5 @@ To run agents, keep your node running and follow the instructions using the [Nap
 * Check out our guide for [contributing to the Naptha Node](https://docs.naptha.ai/Contributing/infrastructure-contributor)
 * Apply to join our [Discord community](https://naptha.ai/naptha-community) 
 * Check our open positions at [naptha.ai/careers](https://naptha.ai/careers)
+
 
