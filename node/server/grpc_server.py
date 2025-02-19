@@ -173,9 +173,9 @@ class GrpcServerServicer(grpc_server_pb2_grpc.GrpcServerServicer):
             run_input = config["input_class"](**request_dict)
             run_input.inputs = request_dict.get('inputs', {})
 
-            if not run_input.deployment.initialized:
-                deployment = await self.create_module(run_input.deployment)
-                run_input.deployment = deployment
+            # if not run_input.deployment.initialized:
+            #     deployment = await self.create_module(run_input.deployment)
+            #     run_input.deployment = deployment
 
             async with LocalDBPostgres() as db:
                 module_run = await config["db_create"](db, run_input)

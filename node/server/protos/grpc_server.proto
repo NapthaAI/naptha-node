@@ -61,7 +61,10 @@ message NodeConfig {
     optional string os = 17;
     optional int64 ram = 18;
     optional int64 vram = 19;
+    repeated string provider_types = 20;
+    repeated string models = 21;
 }
+
 
 message Module {
     string id = 1;
@@ -136,6 +139,7 @@ message ModuleRunRequest {
         BaseDeployment environment_deployment = 8;
     }
     repeated ModuleRun orchestrator_runs = 9;
+    optional string signature = 10;
 }
 
 message ModuleRun {
@@ -160,6 +164,7 @@ message ModuleRun {
     optional string completed_time = 17;
     optional double duration = 18;
     optional string input_schema_ipfs_hash = 19;
+    optional string signature = 20;
 }
 
 message ModuleRunCheck {
