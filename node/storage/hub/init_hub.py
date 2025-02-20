@@ -42,7 +42,7 @@ def import_surql():
         f"{surql_path}/memory.surql",
         f"{surql_path}/tool.surql",
         f"{surql_path}/testdata.surql",
-        
+        f"{surql_path}/api_secrets.surql",
     ]
 
     for file in import_files:

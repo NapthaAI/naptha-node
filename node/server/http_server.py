@@ -3,10 +3,12 @@ import httpx
 import logging
 import traceback
 from datetime import datetime
-from typing import Union, Any, Dict
+from typing import Union, Any, Dict, List, Optional
 import uvicorn
-from dotenv import load_dotenv
-from fastapi import FastAPI, APIRouter, HTTPException, Request
+import os
+import base64
+from dotenv import load_dotenv, dotenv_values
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -37,6 +39,7 @@ from node.schemas import (
     KBRun,
     ModuleExecutionType,
     ToolDeployment,
+    SecretInput
 )
 from node.storage.db.db import LocalDBPostgres
 from node.storage.hub.hub import HubDBSurreal
@@ -46,7 +49,7 @@ from node.worker.package_worker import run_agent, run_tool, run_environment, run
 from node.client import Node as NodeClient
 from node.storage.server import router as storage_router
 from node.inference.server import router as inference_router
-import os
+from node.secret import Secret
 
 logger = logging.getLogger(__name__)
 load_dotenv()
@@ -61,6 +64,7 @@ LITELLM_URL = "http://litellm:4000" if os.getenv("LAUNCH_DOCKER") == "true" else
 if not LITELLM_MASTER_KEY:
     raise Exception("Missing LITELLM_MASTER_KEY for authentication")
 
+
 class TransientDatabaseError(Exception):
     pass
 
@@ -73,6 +77,7 @@ class HTTPServer:
         router = APIRouter()
         self.server = None
         self.should_exit = False
+        self.secret = Secret()
 
         @self.app.on_event("shutdown")
         async def shutdown_event():
@@ -98,6 +103,15 @@ class HTTPServer:
                     "body": await request.json()
                 }
             )
+        
+        @router.get("/.well-known/jwks.json")
+        async def get_public_key():
+            try:
+                jwk = self.secret.get_public_key()
+
+                return {"keys" : [jwk]}
+            except Exception as e:
+                return {"error": f"Error retrieving public key: {str(e)}"}
 
         @router.post("/agent/create")
         async def agent_create_endpoint(agent_input: AgentDeployment) -> AgentDeployment:
@@ -277,6 +291,30 @@ class HTTPServer:
             if '_sa_instance_state' in response:
                 response.pop('_sa_instance_state')
             return response
+        
+        @router.post("/user/secret/create")
+        async def user_secret_create_endpoint(secrets: List[SecretInput], signature: str, is_update: Optional[bool] = Query(False)):
+            user_id = secrets[0].user_id.replace("<record>", "") if secrets else ""
+
+            if not user_id:
+                raise HTTPException(status_code=400, detail=f"Data cannot be empty")
+            
+            if not verify_signature(user_id, signature, user_id.split(":")[1]):
+                raise HTTPException(status_code=401, detail="Unauthorized: Invalid signature")
+            
+            try:
+                aes_secret = base64.b64decode(os.getenv("AES_SECRET"))
+                for data in secrets:
+                    rsa_decrypted_secret_value = self.secret.decrypt_rsa(data.secret_value)
+                    encrypted_secret_value = self.secret.encrypt_with_aes(rsa_decrypted_secret_value, aes_secret)
+                    data.secret_value = encrypted_secret_value
+                
+                async with HubDBSurreal() as hub:
+                    result = await hub.create_secret(secrets, is_update)
+                
+                return result
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Error processing secrets: {str(e)}")
 
         async def get_server_connection(self, server_id: str):
             """
@@ -404,6 +442,15 @@ class HTTPServer:
 
             if not verify_signature(module_run_input.consumer_id, module_run_input.signature, user_public_key):
                 raise HTTPException(status_code=401, detail="Unauthorized: Invalid signature")
+            
+            user_env_data = {}
+            async with HubDBSurreal() as hub:
+                secret = Secret()
+                secret_data = await hub.get_user_secrets(module_run_input.consumer_id)
+                
+                for record in secret_data:
+                    decrypted_value = secret.decrypt_with_aes(record["secret_value"], base64.b64decode(os.getenv("AES_SECRET")))
+                    user_env_data[record["key_name"]] = decrypted_value
 
             # Create module run record in DB
             async with LocalDBPostgres() as db:
@@ -419,17 +466,17 @@ class HTTPServer:
             # Execute the task based on module type
             if module_run_input.deployment.module.execution_type == ModuleExecutionType.package:
                 if module_type == "agent":
-                    _ = run_agent.delay(module_run_data)
+                    _ = run_agent.delay(module_run_data, user_env_data)
                 elif module_type == "tool":
-                    _ = run_tool.delay(module_run_data)
+                    _ = run_tool.delay(module_run_data, user_env_data)
                 elif module_type == "orchestrator":
-                    _ = run_orchestrator.delay(module_run_data)
+                    _ = run_orchestrator.delay(module_run_data, user_env_data)
                 elif module_type == "environment":
-                    _ = run_environment.delay(module_run_data)
+                    _ = run_environment.delay(module_run_data, user_env_data)
                 elif module_type == "kb":
-                    _ = run_kb.delay(module_run_data)
+                    _ = run_kb.delay(module_run_data, user_env_data)
                 elif module_type == "memory":
-                    _ = run_memory.delay(module_run_data)                   
+                    _ = run_memory.delay(module_run_data, user_env_data)                   
             elif module_run_input.deployment.module.execution_type == ModuleExecutionType.docker and module_type == "agent":
                 # validate docker params
                 try:

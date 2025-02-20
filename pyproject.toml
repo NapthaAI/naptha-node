@@ -44,6 +44,7 @@ sqlalchemy = "^2.0.36"
 alembic = "^1.13.3"
 aiohttp = "^3.11.9"
 psycopg2 = "^2.9.10"
+cryptography = "^44.0.0"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.1.11"
