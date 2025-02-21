@@ -54,8 +54,8 @@ class HubDBSurreal(AsyncMixin):
     @asynccontextmanager
     async def root_user_context(self):
         try:
-            # Sign in as regular user if local hub is true
-            if os.getenv("LOCAL_HUB").lower() == "true":
+            # Sign in as regular user if local hub is false
+            if os.getenv("LOCAL_HUB").lower() == "false":
                 await self.surrealdb.signin(
                     {
                         "username": os.getenv("HUB_USERNAME"), 
@@ -66,11 +66,11 @@ class HubDBSurreal(AsyncMixin):
                     }
                 )
             else:
-                # Sign in as root user if local hub is false
+                # Sign in as root user if local hub is true
                 await self.surrealdb.signin({"user": os.getenv("HUB_DB_SURREAL_ROOT_USER"), "pass": os.getenv("HUB_DB_SURREAL_ROOT_PASS")})
             yield
         finally:
-            if os.getenv("LOCAL_HUB").lower() == "false":
+            if os.getenv("LOCAL_HUB").lower() == "true":
                 logger.info("Signing out from root user")
             await self.close()
 
