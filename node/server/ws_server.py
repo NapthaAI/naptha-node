@@ -338,9 +338,9 @@ class WebSocketServer:
             run_input = config["input_class"](**data)
             logger.info(f"Received task: {run_input}")
 
-            if not run_input.deployment.initialized:
-                deployment = await self.create_module(run_input.deployment)
-                run_input.deployment = deployment
+            # if not run_input.deployment.initialized:
+            #     deployment = await self.create_module(run_input.deployment)
+            #     run_input.deployment = deployment
 
             async with LocalDBPostgres() as db:
                 module_run = await config["db_create"](db, run_input)
@@ -484,7 +484,9 @@ class WebSocketServer:
             limit_concurrency=2000,
             backlog=4096,
             timeout_graceful_shutdown=5,
-            reload=False
+            reload=False,
+            ws_ping_interval=20,
+            ws_ping_timeout=30     
         )
         self.server = uvicorn.Server(config)
         self._started = True
