@@ -1,0 +1,140 @@
+# Services required to run & use the Naptha Node, plus the Node container itself.
+# start whichever services you want/need - all, some, or just one.
+
+services:
+  rabbitmq:
+    image: rabbitmq:4-alpine
+    container_name: node-rabbitmq
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RMQ_USER:?error}
+      RABBITMQ_DEFAULT_PASS: ${RMQ_PASSWORD:?error} # loaded from .env file, MUST be present else error
+      RABBITMQ_DEFAULT_VHOST: '/'
+      RABBITMQ_MANAGEMENT_PASSWORD: ${RMQ_PASSWORD:?error} # loaded from .env file, MUST be present else error
+    restart: unless-stopped
+    healthcheck:
+      test: rabbitmq-diagnostics check_port_connectivity
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - '5672:5672' # exposed for testing, but should not be in production.
+      # - '15672:15672' # this is the management port, e.g. if you want rabbitmq:4-management
+
+  pgvector:
+    image: pgvector/pgvector:pg17
+    container_name: node-pgvector
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql # init SQL script to create databases etc.
+    environment:
+      POSTGRES_USER: ${LOCAL_DB_POSTGRES_USERNAME?:error}
+      PGUSER: ${LOCAL_DB_POSTGRES_USERNAME?:error}
+      POSTGRES_PASSWORD: ${LOCAL_DB_POSTGRES_PASSWORD:?error}
+    restart: unless-stopped
+    healthcheck:
+      test: pg_isready -d postgres
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - '5433:5432' # exposed for testing, but should not be for production
+
+  surrealdb:
+    container_name: surrealdb
+    image: surrealdb/surrealdb:latest
+    user: root # surrealdb has to be run as root which is dumb
+    command: start -A rocksdb:/surreal_data/hub.db --user ${HUB_DB_SURREAL_ROOT_USER:?error} --pass ${HUB_DB_SURREAL_ROOT_PASS:?error}
+    volumes:
+      - surreal_data:/surreal_data
+    restart: unless-stopped
+    ports:
+      - '3001:8000'
+
+  node-app:
+    # can replace this with naptha image once it's published to hub, then we just
+    # need to use the .env file UNLESS config.py is modified
+    container_name: node-app
+    build:
+      dockerfile: Dockerfile-node-dev
+    env_file:
+      - ./.env
+    environment:
+      LOCAL_DB_POSTGRES_PASSWORD: ${LOCAL_DB_POSTGRES_PASSWORD:?error}
+      RMQ_USER: ${RMQ_USER:?error}
+      RMQ_PASSWORD: ${RMQ_PASSWORD:?error}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?error}
+
+    volumes:
+      - ./node/storage/db/alembic/versions:/app/node/storage/db/alembic/versions
+      - ./node/storage/fs:/app/node/storage/fs
+      - ./node/storage/hub/modules:/app/node/storage/hub/modules
+      - ./${PRIVATE_KEY}:/app/${PRIVATE_KEY}
+    # restart: unless-stopped
+    depends_on:
+      pgvector:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./node
+          target: /app/node
+          ignore:
+            - ./node/inference/ollama
+            - ./node/storage/db/alembic
+        - action: rebuild
+          path: pyproject.toml
+        - action: rebuild
+          path: poetry.lock
+        - action: rebuild
+          path: .env
+    ports:
+      - '7001:7001'
+      - '7002:7002'
+
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: node-ollama
+    entrypoint: /bin/bash -c "(/bin/ollama serve &); sleep 5 && /bin/ollama run hermes3:8b"
+    tty: true
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+    volumes:
+      - ./node/inference/ollama/models:/root/.ollama
+    ports:
+      - '11435:11434' # TODO do not expose in production
+
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    command: --config /app/config.yaml
+    restart: unless-stopped
+    depends_on:
+      pgvector:
+        condition: service_healthy
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?error}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?error}
+      DATABASE_URL: postgresql://${LOCAL_DB_POSTGRES_USERNAME?:error}:${LOCAL_DB_POSTGRES_PASSWORD:?error}@pgvector:5432/litellm
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?error}
+    volumes:
+      - ./node/inference/litellm/litellm_config.yml:/app/config.yaml
+    healthcheck:
+      test: bash -c ':> /dev/tcp/127.0.0.1/4000' || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5    
+    ports:
+      - '4000:4000' # TODO do not expose in production
+
+networks:
+  default:
+    name: node-network
+volumes:
+  rabbitmq_data: # persist rabbitMQ data e.g. anything durable; users & credentials; configs
+  postgres_data:
+  surreal_data:
