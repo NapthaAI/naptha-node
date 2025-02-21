@@ -54,11 +54,24 @@ class HubDBSurreal(AsyncMixin):
     @asynccontextmanager
     async def root_user_context(self):
         try:
-            # Sign in as root user
-            await self.surrealdb.signin({"user": os.getenv("HUB_DB_SURREAL_ROOT_USER"), "pass": os.getenv("HUB_DB_SURREAL_ROOT_PASS")})
+            # Sign in as regular user if local hub is true
+            if os.getenv("LOCAL_HUB").lower() == "true":
+                await self.surrealdb.signin(
+                    {
+                        "username": os.getenv("HUB_USERNAME"), 
+                        "password": os.getenv("HUB_PASSWORD"),
+                        "NS": self.ns,
+                        "DB": self.db,
+                        "AC": "user"
+                    }
+                )
+            else:
+                # Sign in as root user if local hub is false
+                await self.surrealdb.signin({"user": os.getenv("HUB_DB_SURREAL_ROOT_USER"), "pass": os.getenv("HUB_DB_SURREAL_ROOT_PASS")})
             yield
         finally:
-            logger.info("Signing out from root user")
+            if os.getenv("LOCAL_HUB").lower() == "false":
+                logger.info("Signing out from root user")
             await self.close()
 
     async def signin(
@@ -263,8 +276,8 @@ class HubDBSurreal(AsyncMixin):
     async def create_agent(self, agent_config: Dict) -> Tuple[bool, Optional[Dict]]:
         return await self.surrealdb.create("agent", agent_config)
 
-    def prepare_batch_query(self, secret_config: List[SecretInput], existing_data: List, update:bool = False) -> str:
-        existing_data_dict = {secret['key_name'] for secret in existing_data if 'key_name' in secret}
+    def prepare_batch_query(self, secret_config: List[SecretInput], existing_secrets: List[SecretInput], update:bool = False) -> str:
+        existing_secrets_dict = {secret.key_name for secret in existing_secrets}
         records_to_insert = []
         records_to_update = []
         
@@ -273,7 +286,7 @@ class HubDBSurreal(AsyncMixin):
             key_name = secret.key_name
             key_value = secret.secret_value
 
-            if not existing_data_dict or key_name not in existing_data_dict:
+            if not existing_secrets_dict or key_name not in existing_secrets_dict:
                 records_to_insert.append({
                     "user_id": user_id,
                     "key_name": key_name, 
@@ -302,14 +315,13 @@ class HubDBSurreal(AsyncMixin):
             "update_params": records_to_update
         }
     
-    async def create_secret(self, secret_config: List[SecretInput], update: bool = False) -> str:
+    async def create_secret(self, secret_config: List[SecretInput], update: bool = False, existing_secrets: List[SecretInput] = []) -> str:
         try:
             user_id = secret_config[0].user_id.replace("<record>", "").strip()
             if not user_id:
                 return "Invalid user ID"
 
-            existing_data = await self.get_user_secrets(user_id)
-            query_data = self.prepare_batch_query(secret_config, existing_data, update)
+            query_data = self.prepare_batch_query(secret_config, existing_secrets, update)
 
             if not (query_data["insert_query"] or query_data["update_query"]):
                 return "Records already exist"
@@ -347,7 +359,9 @@ class HubDBSurreal(AsyncMixin):
 
                     results = await self.surrealdb.query(transaction_query, params)
 
-                    if all(result.get('status') == 'OK' for result in results):
+                    logger.info(f"Results: {results}")
+
+                    if all(result.get('status') == 'OK' for result in results) and any(result.get('result') for result in results):
                         return "Records updated successfully"
                     else:
                         return "Operation failed: Database error"
@@ -359,14 +373,6 @@ class HubDBSurreal(AsyncMixin):
         except Exception as e:
             logger.error(f"Secret creation failed: {str(e)}")
             return "Operation failed: Invalid input"
-
-    async def get_user_secrets(self, user_id: str) -> str:
-        async with self.root_user_context():
-            result = await self.surrealdb.query(
-                "SELECT key_name, secret_value FROM api_secrets WHERE user_id=$user_id", {
-                    'user_id': user_id
-            })
-            return result[0]['result']
     
     async def close(self):
         """Close the database connection"""
