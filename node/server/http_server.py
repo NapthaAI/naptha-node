@@ -444,13 +444,17 @@ class HTTPServer:
                 raise HTTPException(status_code=401, detail="Unauthorized: Invalid signature")
             
             user_env_data = {}
-            async with HubDBSurreal() as hub:
-                secret = Secret()
-                secret_data = await hub.get_user_secrets(module_run_input.consumer_id)
-                
-                for record in secret_data:
-                    decrypted_value = secret.decrypt_with_aes(record["secret_value"], base64.b64decode(os.getenv("AES_SECRET")))
-                    user_env_data[record["key_name"]] = decrypted_value
+            try:
+                async with HubDBSurreal() as hub:
+                    secret = Secret()
+                    secret_data = await hub.get_user_secrets(module_run_input.consumer_id)
+                    
+                    for record in secret_data:
+                        decrypted_value = secret.decrypt_with_aes(record["secret_value"], base64.b64decode(os.getenv("AES_SECRET")))
+                        user_env_data[record["key_name"]] = decrypted_value
+            except Exception as e:
+                logger.error(f"Failed to get user secrets: {str(e)}")
+                user_env_data = {}
 
             # Create module run record in DB
             async with LocalDBPostgres() as db:
