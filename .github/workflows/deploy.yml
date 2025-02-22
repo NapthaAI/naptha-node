@@ -3,12 +3,12 @@ name: Deploy Application
 on:
   push:
     branches:
-      - feat/deploy-actions
+      - feat/deploy-actions # TODO: Change this to main once testing is done
   pull_request:
     types:
       - closed
     branches:
-      - feat/deploy-actions
+      - feat/deploy-actions # TODO: Change this to main once testing is done
 
 jobs:
   deploy:
@@ -42,8 +42,8 @@ jobs:
             sudo chown -R ubuntu:ubuntu $DEPLOY_PATH
             cd $DEPLOY_PATH
             sudo git stash
-            git fetch origin feat/deploy-actions
-            git reset --hard origin/feat/deploy-actions
+            git fetch origin main
+            git reset --hard origin/main
             sudo bash stop_service.sh
             sudo bash launch.sh
             echo "Deployment completed to Instance ${{ matrix.instance }} at \$(date)"
