@@ -1,6 +1,6 @@
 DEFINE TABLE api_secrets SCHEMAFULL
     PERMISSIONS
-        FOR select, create, update, delete WHERE user_id = $auth.id
+        FOR select, create, update, delete WHERE user_id = $auth.id;
 
 DEFINE FIELD user_id ON api_secrets TYPE record<user>;
 DEFINE FIELD secret_value ON api_secrets TYPE string;   
