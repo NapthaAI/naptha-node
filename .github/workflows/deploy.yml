@@ -27,25 +27,32 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/daimon.pem
           chmod 600 ~/.ssh/daimon.pem
-          ssh-keyscan -H "${{ secrets.EC2_HOST_${{ matrix.instance }} }}" >> ~/.ssh/known_hosts
+          if [ "${{ matrix.instance }}" == "1" ]; then
+            ssh-keyscan -H "${{ secrets.EC2_HOST_1 }}" >> ~/.ssh/known_hosts
+          else
+            ssh-keyscan -H "${{ secrets.EC2_HOST_2 }}" >> ~/.ssh/known_hosts
+          fi
 
       - name: Deploy to EC2 Instance ${{ matrix.instance }}
+        env:
+          EC2_HOST: ${{ matrix.instance == 1 && secrets.EC2_HOST_1 || secrets.EC2_HOST_2 }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
-          ssh -i ~/.ssh/daimon.pem ubuntu@${{ secrets.EC2_HOST_${{ matrix.instance }} }} << 'EOF'
-            cd ${{ secrets.DEPLOY_PATH }}
+          ssh -i ~/.ssh/daimon.pem ubuntu@$EC2_HOST << EOF
+            cd $DEPLOY_PATH
             git stash
-            git fetch origin feat/deploy-actions     # TODO: Change this to main once testing is done
-            git reset --hard origin/feat/deploy-actions  # TODO: Change this to main once testing is done
+            git fetch origin feat/deploy-actions
+            git reset --hard origin/feat/deploy-actions
             git stash pop || true
             bash stop_service.sh
             bash launch.sh
-            echo "Deployment completed to Instance ${{ matrix.instance }} at $(date)"
+            echo "Deployment completed to Instance ${{ matrix.instance }} at \$(date)"
           EOF
 
       - name: Deployment Status
         if: always()
         run: |
-          if [ ${{ job.status }} == 'success' ]; then
+          if [ "${{ job.status }}" == "success" ]; then
             echo "✅ Deployment successful to Instance ${{ matrix.instance }}"
           else
             echo "❌ Deployment failed for Instance ${{ matrix.instance }}"
