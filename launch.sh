@@ -1860,7 +1860,7 @@ startup_summary() {
             services+=("$(echo $NODE_COMMUNICATION_PROTOCOL | tr '[:lower:]' '[:upper:]')_Server_${port}")
             
             # Health check based on server type
-            if [ "${NODE_COMMUNICATION_PROTOCOL}" = "ws" ]; then
+            if [ "${NODE_COMMUNICATION_PROTOCOL}" = "ws" -o "${NODE_COMMUNICATION_PROTOCOL}" = "wss" ]; then
                 # WebSocket health check using /health endpoint
                 if curl -s http://localhost:$port/health > /dev/null; then
                     statuses+=("✅")

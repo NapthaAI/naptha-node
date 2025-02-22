@@ -39,12 +39,13 @@ jobs:
           DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           ssh -i ~/.ssh/daimon.pem ubuntu@$EC2_HOST << EOF
+            sudo chown -R ubuntu:ubuntu $DEPLOY_PATH
             cd $DEPLOY_PATH
             sudo git stash
             git fetch origin feat/deploy-actions
             git reset --hard origin/feat/deploy-actions
-            bash stop_service.sh
-            bash launch.sh
+            sudo bash stop_service.sh
+            sudo bash launch.sh
             echo "Deployment completed to Instance ${{ matrix.instance }} at \$(date)"
           EOF
 
