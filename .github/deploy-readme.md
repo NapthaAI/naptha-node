@@ -12,19 +12,36 @@ The deployment workflow automates the following steps:
 
 ## Prerequisites
 
-Before using this workflow, ensure you have the following setup:
+### Initial Server Setup
+Before using this workflow, you must manually set up each EC2 instance:
 
-1. An Amazon EC2 instance running Ubuntu
-2. The following GitHub repository secrets configured:
+1. Launch Ubuntu EC2 instances
+2. Set up the deployment environment on each instance:
+   - Clone the repository to the target deployment path
+   - Create and configure the `.env` file with required environment variables
+   - Install all necessary dependencies (Node.js, Python, etc.)
+   - Ensure `launch.sh` and `stop_service.sh` are executable (`chmod +x *.sh`)
+   - Test the application manually to verify the environment is properly configured
+
+### GitHub Configuration
+After server setup, configure the following GitHub repository secrets:
+
+1. For single instance deployment:
    - `EC2_SSH_KEY`: The private SSH key for connecting to the EC2 instance
    - `EC2_HOST`: The hostname or IP address of your EC2 instance
-   - `DEPLOY_PATH`: The path on the EC2 instance where the application should be deployed
+   - `DEPLOY_PATH`: The path on the EC2 instance where the application is deployed
+
+2. For dual instance deployment:
+   - `EC2_SSH_KEY`: The private SSH key (same key for both instances)
+   - `EC2_HOST_1`: The hostname/IP for the first EC2 instance
+   - `EC2_HOST_2`: The hostname/IP for the second EC2 instance
+   - `DEPLOY_PATH`: The deployment path (must be same on both instances)
 
 ## Trigger Conditions
 
 The workflow triggers under two conditions:
-- On push to the `feat/deploy-actions` branch
-- When a pull request to the `feat/deploy-actions` branch is merged
+- On push to the `main` branch
+- When a pull request to the `main` branch is merged
 
 ## Deployment Process
 
@@ -54,8 +71,8 @@ The workflow expects the following files to exist in your repository:
 ## Usage
 
 No manual intervention is needed for deployment. The workflow will automatically run when:
-- Code is pushed to the `feat/deploy-actions` branch
-- A pull request to the `feat/deploy-actions` branch is merged
+- Code is pushed to the `main` branch
+- A pull request to the `main` branch is merged
 
 ## Monitoring
 
@@ -65,7 +82,7 @@ You can monitor deployments in the GitHub Actions tab of your repository. Each d
 
 ## Note
 
-Currently, the workflow is configured to use the `feat/deploy-actions` branch. This will be updated to use the `main` branch once testing is completed.
+The workflow is configured to deploy from the `main` branch. All deployments will happen either through direct pushes to `main` or when pull requests are merged into `main`.
 
 ## Troubleshooting
 
