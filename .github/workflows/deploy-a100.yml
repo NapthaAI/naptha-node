@@ -30,7 +30,7 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Deploy to A100 Instance 
+      - name: Deploy to A100 Instance
         env:
           HOST: ${{ secrets.A100_HOST_2 }}
           DEPLOY_USER: ${{ secrets.A100_USER }}
@@ -40,23 +40,41 @@ jobs:
             # Load environment and Python
             export PATH="/home/$USER/miniforge3/bin:$PATH"
             source ~/.bashrc
+
+            # Explicitly activate conda environment
             source /home/$USER/miniforge3/bin/activate
+
+            # Check Python and pip
+            echo "Python version:"
+            python --version
+            echo "Python location:"
+            which python
+            echo "Pip location:"
+            which pip
 
             # Navigate and setup deployment
             sudo chown -R $DEPLOY_USER:$DEPLOY_USER $DEPLOY_PATH
             cd $DEPLOY_PATH
             
+            # Git operations
             sudo git stash
-            git fetch origin feat/deploy-actions
-            git reset --hard origin/feat/deploy-actions
+            git fetch origin main
+            git reset --hard origin/main
             
+            # Install required Python packages if needed
+            if [ -f requirements.txt ]; then
+              pip install -r requirements.txt
+            fi
+
             # Make scripts executable
             chmod +x ./docker-ctl.sh
             
             # Your deployment commands
             docker compose -f docker-compose.yml build --no-cache
             ./docker-ctl.sh down
-            sudo -E bash launch.sh
+            
+            # Run launch.sh with Python environment preserved
+            sudo -E PATH=$PATH bash launch.sh
             echo "Deployment completed at $(date)"
           EOF
 
