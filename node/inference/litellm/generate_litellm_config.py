@@ -27,7 +27,8 @@ MODEL_DEVICE_REQUIREMENTS = {
     "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B": 2,
     "microsoft/phi-4": 1,
     "mistralai/Mistral-Small-24B-Instruct-2501": 2,
-    "Qwen/QwQ-32B-Preview": 2
+    "Qwen/QwQ-32B-Preview": 2,
+    "NousResearch/DeepHermes-3-Llama-3-8B-Preview": 1
 }
 
 if VLLM_MODELS:

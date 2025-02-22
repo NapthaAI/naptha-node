@@ -1,0 +1,33 @@
+services:
+  DeepHermes-3-Llama-3-8B-Preview:
+    image: vllm/vllm-openai:latest
+    entrypoint: [
+      "vllm", "serve", "NousResearch/DeepHermes-3-Llama-3-8B-Preview",
+      "--enable-prefix-caching", "--enable-chunked-prefill",
+      "--gpu-memory-utilization", "0.98",
+      "--max-model-len", "131072",
+      "--enable-auto-tool-choice", "--tool-call-parser", "hermes"
+    ]
+    environment:
+      HUGGING_FACE_HUB_TOKEN: ${HUGGINGFACE_TOKEN:?error}
+    volumes:
+      - type: bind
+        source: ${HF_HOME:?error}
+        target: /root/.cache/huggingface
+      - type: bind
+        source: ./node/inference/configs
+        target: /usr/app # configs like chat templates, vllm configs, tool parsers
+    ipc: host
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: "nvidia"
+              capabilities: [ "gpu" ]
+              device_ids: ["${GPU_ID_deephermes_3_llama_3_8b_preview:?error}"]
+    networks:
+      - naptha-network
+
+networks:
+  naptha-network:
+    external: true
