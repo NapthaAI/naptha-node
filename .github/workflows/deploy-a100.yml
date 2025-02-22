@@ -36,31 +36,27 @@ jobs:
           DEPLOY_USER: ${{ secrets.A100_USER }}
           DEPLOY_PATH: ${{ secrets.A100_DEPLOY_PATH }}
         run: |
-          ssh -o StrictHostKeyChecking=no $DEPLOY_USER@$HOST << 'EOF'
-            # Debug information
+          # Pass environment variables explicitly to the SSH command
+          ssh -o StrictHostKeyChecking=no $DEPLOY_USER@$HOST "DEPLOY_PATH='${DEPLOY_PATH}' bash -s" << 'EOF'
             echo "Current user: $(whoami)"
             echo "Current directory: $(pwd)"
-            echo "DEPLOY_PATH: $DEPLOY_PATH"
-            echo "Listing current directory:"
-            ls -la
+            echo "DEPLOY_PATH: ${DEPLOY_PATH}"
             
-            # Your other commands...
-            sudo mkdir -p $DEPLOY_PATH
+            if [ -z "${DEPLOY_PATH}" ]; then
+              echo "Error: DEPLOY_PATH is not set"
+              exit 1
+            fi
+
+            # Create and navigate to deploy path
+            sudo mkdir -p ${DEPLOY_PATH}
             echo "Listing DEPLOY_PATH directory:"
-            ls -la $DEPLOY_PATH
+            ls -la ${DEPLOY_PATH}
             
-            sudo chown -R $DEPLOY_USER:$DEPLOY_USER $DEPLOY_PATH
-            cd $DEPLOY_PATH
+            sudo chown -R $(whoami):$(whoami) ${DEPLOY_PATH}
+            cd ${DEPLOY_PATH}
             echo "After cd to DEPLOY_PATH:"
             pwd
             ls -la
-            sudo git stash
-            git fetch origin main
-            git reset --hard origin/main
-            docker compose -f docker-compose.yml build --no-cache
-            ./docker-ctl down
-            sudo bash launch.sh
-            echo "Deployment completed at $(date)"
           EOF
 
       - name: Deployment Status
