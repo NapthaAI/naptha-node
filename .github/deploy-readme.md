@@ -1,6 +1,6 @@
 # Application Deployment Workflow
 
-This repository contains a GitHub Actions workflow for automated deployment to an Amazon EC2 instance. The workflow is triggered either by pushing to the `feat/deploy-actions` branch or when a pull request to this branch is merged.
+This repository contains a GitHub Actions workflow for automated deployment to an Amazon EC2 instance. The workflow is triggered either by pushing to the `main` or when a pull request to merged to main.
 
 ## Workflow Overview
 
