@@ -1,0 +1,52 @@
+name: Deploy Application
+
+on:
+  push:
+    branches:
+      - feat/deploy-actions
+  pull_request:
+    types:
+      - closed
+    branches:
+      - feat/deploy-actions
+
+jobs:
+  deploy:
+    if: github.event.pull_request.merged == true || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        instance: [1, 2]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/daimon.pem
+          chmod 600 ~/.ssh/daimon.pem
+          ssh-keyscan -H "${{ secrets.EC2_HOST_${{ matrix.instance }} }}" >> ~/.ssh/known_hosts
+
+      - name: Deploy to EC2 Instance ${{ matrix.instance }}
+        run: |
+          ssh -i ~/.ssh/daimon.pem ubuntu@${{ secrets.EC2_HOST_${{ matrix.instance }} }} << 'EOF'
+            cd ${{ secrets.DEPLOY_PATH }}
+            git stash
+            git fetch origin feat/deploy-actions     # TODO: Change this to main once testing is done
+            git reset --hard origin/feat/deploy-actions  # TODO: Change this to main once testing is done
+            git stash pop || true
+            bash stop_service.sh
+            bash launch.sh
+            echo "Deployment completed to Instance ${{ matrix.instance }} at $(date)"
+          EOF
+
+      - name: Deployment Status
+        if: always()
+        run: |
+          if [ ${{ job.status }} == 'success' ]; then
+            echo "✅ Deployment successful to Instance ${{ matrix.instance }}"
+          else
+            echo "❌ Deployment failed for Instance ${{ matrix.instance }}"
+          fi
