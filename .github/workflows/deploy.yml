@@ -43,7 +43,6 @@ jobs:
             git stash
             git fetch origin feat/deploy-actions
             git reset --hard origin/feat/deploy-actions
-            git stash pop || true
             bash stop_service.sh
             bash launch.sh
             echo "Deployment completed to Instance ${{ matrix.instance }} at \$(date)"
