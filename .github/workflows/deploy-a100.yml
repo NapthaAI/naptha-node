@@ -37,8 +37,23 @@ jobs:
           DEPLOY_PATH: ${{ secrets.A100_DEPLOY_PATH }}
         run: |
           ssh -o StrictHostKeyChecking=no $DEPLOY_USER@$HOST << 'EOF'
+            # Debug information
+            echo "Current user: $(whoami)"
+            echo "Current directory: $(pwd)"
+            echo "DEPLOY_PATH: $DEPLOY_PATH"
+            echo "Listing current directory:"
+            ls -la
+            
+            # Your other commands...
+            sudo mkdir -p $DEPLOY_PATH
+            echo "Listing DEPLOY_PATH directory:"
+            ls -la $DEPLOY_PATH
+            
             sudo chown -R $DEPLOY_USER:$DEPLOY_USER $DEPLOY_PATH
             cd $DEPLOY_PATH
+            echo "After cd to DEPLOY_PATH:"
+            pwd
+            ls -la
             sudo git stash
             git fetch origin main
             git reset --hard origin/main
