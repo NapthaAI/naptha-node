@@ -40,7 +40,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/daimon.pem ubuntu@$EC2_HOST << EOF
             cd $DEPLOY_PATH
-            git stash
+            sudo git stash
             git fetch origin feat/deploy-actions
             git reset --hard origin/feat/deploy-actions
             bash stop_service.sh
