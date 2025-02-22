@@ -1,0 +1,53 @@
+name: Deploy Application
+
+on:
+  push:
+    branches:
+      - feat/deploy-actions # TODO: Change to main later
+  pull_request:
+    types:
+      - closed
+    branches:
+      - feat/deploy-actions # TODO: Change to main later
+
+jobs:
+  deploy:
+    if: github.event.pull_request.merged == true || github.event_name == 'push'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          known-hosts: ${{ secrets.SSH_KNOWN_HOSTS }}
+
+      - name: Deploy to A100 Instance
+        env:
+          HOST: ${{ secrets.A100_HOST_2 }}
+          DEPLOY_USER: ${{ secrets.A100_USER }}
+          DEPLOY_PATH: ${{ secrets.A100_DEPLOY_PATH }}
+        run: |
+          ssh $DEPLOY_USER@$HOST << 'EOF'
+            sudo chown -R $DEPLOY_USER:$DEPLOY_USER $DEPLOY_PATH
+            cd $DEPLOY_PATH
+            sudo git stash
+            git fetch origin main
+            git reset --hard origin/main
+            docker compose -f docker-compose.yml build --no-cache
+            ./docker-ctl down
+            sudo bash launch.sh
+            echo "Deployment completed at $(date)"
+          EOF
+
+      - name: Deployment Status
+        if: always()
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "✅ Deployment successful to A100 Instance"
+          else
+            echo "❌ Deployment failed for A100 Instance"
+          fi
