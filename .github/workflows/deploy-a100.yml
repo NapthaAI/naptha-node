@@ -58,8 +58,8 @@ jobs:
             
             # Git operations
             sudo git stash
-            git fetch origin main
-            git reset --hard origin/main
+            git fetch origin feat/deploy-actions
+            git reset --hard origin/feat/deploy-actions
             
             # Install required Python packages if needed
             if [ -f requirements.txt ]; then
