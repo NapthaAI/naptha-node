@@ -50,7 +50,7 @@ services:
     # need to use the .env file UNLESS config.py is modified
     container_name: node-app
     build:
-      dockerfile: Dockerfile-node-dev
+      dockerfile: napthaai/node:latest
     env_file:
       - ./.env
     volumes:
