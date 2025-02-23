@@ -14,6 +14,9 @@ jobs:
   deploy:
     if: github.event.pull_request.merged == true || github.event_name == 'push'
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        instance: [1, 2]
     
     steps:
       - name: Checkout repository
@@ -30,9 +33,9 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
-      - name: Deploy to A100 Instance
+      - name: Deploy to A100 Instance ${{ matrix.instance }}
         env:
-          HOST: ${{ secrets.A100_HOST_2 }}
+          HOST: ${{ matrix.instance == 1 && secrets.A100_HOST_1 || secrets.A100_HOST_2 }}
           DEPLOY_USER: ${{ secrets.A100_USER }}
           DEPLOY_PATH: ${{ secrets.A100_DEPLOY_PATH }}
         run: |
@@ -82,7 +85,7 @@ jobs:
         if: always()
         run: |
           if [ "${{ job.status }}" == "success" ]; then
-            echo "✅ Deployment successful to A100 Instance"
+            echo "✅ Deployment successful to A100 Instance ${{ matrix.instance }}"
           else
-            echo "❌ Deployment failed for A100 Instance"
+            echo "❌ Deployment failed for A100 Instance ${{ matrix.instance }}"
           fi
