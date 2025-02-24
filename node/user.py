@@ -39,7 +39,7 @@ async def check_user(user_input: Dict) -> Tuple[bool, Dict]:
         user_data["is_registered"] = True
         return True, user_data
     else:
-        logger.info("No user found.")
+        logger.error("No user found.")
         user_data = user_input.copy()
         user_data["is_registered"] = False
         return False, user_data
@@ -51,7 +51,7 @@ async def get_user_public_key(user_id: str) -> str | None:
     if public_key:
         return public_key
     else:
-        logger.info("No user found.")
+        logger.error("No user found.")
         return None
 
 def get_public_key(private_key_hex):

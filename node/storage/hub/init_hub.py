@@ -55,7 +55,7 @@ def import_surql():
                     {file}"""
 
         try:
-            logger.info(f"Importing {file.rsplit('/', 1)[-1]}")
+            logger.debug(f"Importing {file.rsplit('/', 1)[-1]}")
             process = subprocess.Popen(
                 command,
                 shell=True,
@@ -64,8 +64,8 @@ def import_surql():
                 text=True,
             )
             out, err = process.communicate()
-            logger.info(out)
-            logger.info(err)
+            logger.debug(out)
+            logger.debug(err)
         except Exception as e:
             logger.error("Error creating scope")
             logger.error(str(e))
@@ -137,12 +137,16 @@ async def user_setup_flow():
         match user, username_exists, password_exists, existing_public_key_user:
             case _, True, _, True:
                 # Public key exists and doesn't match the provided username and password
+                logger.error(
+                    f"Public key {public_key} exists but doesn't match the provided username ({username}) and password"
+                )
                 raise Exception(
                     f"User with public key {public_key} already exists but doesn't match the provided username and password. Please use a different private key (or set blank in the .env file to randomly generate with launch.sh)."
                 )
 
             case _, False, False, True:
                 # Public key exists and no username/password provided
+                logger.error(f"Public key {public_key} exists but no username/password provided")
                 raise Exception(
                     f"User with public key {public_key} already exists. Cannot create new user. Please use a different private key (or set blank in the .env file to randomly generate with launch.sh)."
                 )
@@ -162,7 +166,7 @@ async def user_setup_flow():
                 while True:
                     username = input("Enter username: ")
                     password = getpass.getpass("Enter password: ") 
-                    print(f"Signing up user: {username} with public key: {public_key}")
+                    logger.info(f"Signing up user: {username} with public key: {public_key}")
                     success, token, user_id = await hub.signup(
                         username, password, public_key
                     )
@@ -175,7 +179,7 @@ async def user_setup_flow():
 
             case None, True, True, False:
                 # User doesn't exist but credentials are provided
-                print(f"Signing up user: {username} with public key: {public_key}")
+                logger.info(f"Signing up user: {username} with public key: {public_key}")
                 success, token, user_id = await hub.signup(
                     username, password, public_key
                 )

@@ -148,7 +148,7 @@ class HubDBSurreal(AsyncMixin):
         """Create a server record in the database"""
         logger.info(f"Creating server: {server_config}")
         server = await self.surrealdb.create("server", server_config)
-        logger.info(f"created server: {server}")
+        logger.debug(f"created server: {server}")
         if isinstance(server, dict):
             return server
         return server[0]
@@ -168,7 +168,7 @@ class HubDBSurreal(AsyncMixin):
 
         logger.info(f"Creating node: {node_config}")
         self.node_config = await self.surrealdb.create(node_id, node_config)
-        logger.info(f"Created node: {self.node_config}")
+        logger.debug(f"Created node: {self.node_config}")
         
         if self.node_config is None:
             raise Exception("Failed to register node")
@@ -360,7 +360,7 @@ class HubDBSurreal(AsyncMixin):
 
                     results = await self.surrealdb.query(transaction_query, params)
 
-                    logger.info(f"Results: {results}")
+                    logger.debug(f"Results: {results}")
 
                     if all(result.get('status') == 'OK' for result in results) and any(result.get('result') for result in results):
                         return "Records updated successfully"

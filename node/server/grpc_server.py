@@ -51,7 +51,7 @@ class GrpcServerServicer(grpc_server_pb2_grpc.GrpcServerServicer):
         logger.info(f"Checking user: {request.public_key}")
         input_data = {"public_key": request.public_key}
         _, user_data = await check_user(input_data)
-        logger.info(f"User check result: {user_data}")
+        logger.debug(f"User check result: {user_data}")
         return grpc_server_pb2.CheckUserResponse(**user_data)
 
     async def RegisterUser(self, request, context):
@@ -59,7 +59,7 @@ class GrpcServerServicer(grpc_server_pb2_grpc.GrpcServerServicer):
         input_data = {"public_key": request.public_key}
         success, user_data = await register_user(input_data)
         if success:
-            logger.info(f"User registration result: {user_data}")
+            logger.debug(f"User registration result: {user_data}")
             return grpc_server_pb2.RegisterUserResponse(**user_data)
         else:
             context.set_code(grpc.StatusCode.INTERNAL)
@@ -90,7 +90,7 @@ class GrpcServerServicer(grpc_server_pb2_grpc.GrpcServerServicer):
             if not module_type:
                 raise Exception("Invalid module deployment type")
 
-            logger.info(f"Creating {module_type}: {module_deployment}")
+            logger.info(f"Creating {module_type}")
 
             main_module_name = module_deployment.module['name'] if isinstance(module_deployment.module, dict) else module_deployment.module.name
             main_module_path = Path(f"{MODULES_SOURCE_DIR}/{main_module_name}/{main_module_name}")

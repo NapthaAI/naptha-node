@@ -26,8 +26,8 @@ async def create_storage_object(
     """Create new storage objects (table, file, or IPFS content)"""
     request_data = json.loads(request_data) if request_data else None
 
-    logger.info(f"Received data: {request_data}")
-    logger.info(f"Received file: {file}")
+    logger.debug(f"Received data: {request_data}")
+    logger.debug(f"Received file: {file}")
 
     location = StorageLocation(storage_type=storage_type, path=path)
     
@@ -245,8 +245,8 @@ async def update_storage_object(
     request_data = json.loads(request_data) if request_data else None
     condition_dict = json.loads(condition) if condition else None
 
-    logger.info(f"Received update data: {request_data}")
-    logger.info(f"Received condition: {condition_dict}")
+    logger.debug(f"Received update data: {request_data}")
+    logger.debug(f"Received condition: {condition_dict}")
 
     location = StorageLocation(storage_type=storage_type, path=path)
     

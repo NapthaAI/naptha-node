@@ -9,6 +9,7 @@ from sqlalchemy import create_engine
 from node.storage.db.models import Base
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 file_path = Path(__file__).parent.resolve()
 alembic_ini_path = file_path / "alembic.ini"
@@ -49,7 +50,7 @@ def init_db():
     logging.info("Creating models if they don't already exist...")
     Base.metadata.create_all(engine)
 
-    print("Database initialization complete.")
+    logger.info("Database initialization complete.")
 
 if __name__ == "__main__":
     init_db()

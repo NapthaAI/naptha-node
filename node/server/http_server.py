@@ -399,7 +399,8 @@ class HTTPServer:
         Unified method to create and install any type of module and its sub-modules
         """
         try:
-            logger.info(f"Creating {module_deployment.module['module_type']}: {module_deployment}")
+            logger.info(f"Creating {module_deployment.module['module_type']}")
+            logger.debug(f"{module_deployment.module['module_type']} module_deployment: {module_deployment}")
 
             main_module_name = module_deployment.module['name']
             main_module_path = Path(f"{MODULES_SOURCE_DIR}/{main_module_name}/{main_module_name}")
@@ -448,7 +449,8 @@ class HTTPServer:
                 
             module_type = module_run_input.deployment.module.module_type
 
-            logger.info(f"Received request to run {module_type}: {module_run_input}")
+            logger.info(f"Received request to run {module_type}")
+            logger.debug(f"Run {module_type} input: {module_run_input}")
 
             user_public_key = await get_user_public_key(module_run_input.consumer_id)
 
@@ -469,7 +471,7 @@ class HTTPServer:
                     raise HTTPException(status_code=500, detail=f"Failed to create {module_type} run")
                 module_run_data = module_run.model_dump()
 
-                logger.info(f"{module_type.capitalize()} run data: {module_run_data}")
+                logger.debug(f"{module_type.capitalize()} run data: {module_run_data}")
 
             await self.register_user_on_worker_nodes(module_run)
 
@@ -608,15 +610,16 @@ class HTTPServer:
             logger.info(f"Found {module_type} status: {module_run.status}")
 
             if module_run.status == "completed":
-                logger.info(f"{module_type.capitalize()} run completed. Returning output: {module_run.results}")
+                logger.info(f"{module_type.capitalize()} run completed.")
+                logger.debug(f"Returning output: {module_run.results}")
                 response = module_run.results
             elif module_run.status == "error":
-                logger.info(f"{module_type.capitalize()} run failed. Returning error: {module_run.error_message}")
+                logger.error(f"{module_type.capitalize()} run failed. Returning error: {module_run.error_message}")
                 response = module_run.error_message
             else:
                 response = None
 
-            logger.info(f"Response: {response}")
+            logger.debug(f"Response: {response}")
             return module_run
 
         except HTTPException:

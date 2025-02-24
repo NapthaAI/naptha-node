@@ -109,8 +109,7 @@ async def _run_module_async(module_run: Union[AgentRun, MemoryRun, ToolRun, Orch
         module_name = module_run_engine.module["name"]
         module = module_run.deployment.module
 
-        logger.info(f"Received {module_run_engine.module_type} run: {module_run}")
-        logger.info(f"Checking if {module_run_engine.module_type} {module_name} version {module_version} is installed")
+        logger.info(f"Received {module_run_engine.module_type} run: {module_run} - Checking if {module_run_engine.module_type} {module_name} version {module_version} is installed")
 
         try:
             await install_module_with_lock(module)
@@ -224,9 +223,9 @@ class ModuleLoader:
             if env_vars:
                 os.environ.update(env_vars)
             
-            logger.info(f"Modified sys.path: {sys.path[:2]}")
-            logger.info(f"Current working directory: {os.getcwd()}")
-            logger.info(f"Injected user env data")
+            logger.debug(f"Modified sys.path: {sys.path[:2]}")
+            logger.debug(f"Current working directory: {os.getcwd()}")
+            logger.debug(f"Injected user env data")
             
             yield
             
@@ -329,9 +328,9 @@ class ModuleRunEngine:
             
             # Log package structure
             logger.info(f"Checking module structure...")
-            logger.info(f"__init__.py exists: {(module_dir / self.module_name / '__init__.py').exists()}")
-            logger.info(f"schemas.py exists: {(module_dir / self.module_name / 'schemas.py').exists()}")
-            logger.info(f"Module directory contents: {list((module_dir / self.module_name).glob('*'))}")
+            logger.debug(f"__init__.py exists: {(module_dir / self.module_name / '__init__.py').exists()}")
+            logger.debug(f"schemas.py exists: {(module_dir / self.module_name / 'schemas.py').exists()}")
+            logger.debug(f"Module directory contents: {list((module_dir / self.module_name).glob('*'))}")
 
             # Get entrypoint name
             entrypoint = self.module['module_entrypoint'].split('.')[0] if 'module_entrypoint' in self.module else 'run'

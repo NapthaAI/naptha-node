@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import logging
 import os
 from pathlib import Path
 import sys
@@ -7,6 +8,7 @@ from typing import Dict, List, Optional
 root_dir = Path(__file__).parent.parent.parent.parent
 sys.path.append(str(root_dir))
 
+logger = logging.getLogger(__name__)
 
 LAUNCH_DOCKER = os.getenv("LAUNCH_DOCKER").lower() == "true"
 LLM_BACKEND = os.getenv("LLM_BACKEND")
@@ -35,11 +37,11 @@ if VLLM_MODELS:
     VLLM_MODELS = VLLM_MODELS.split(",")
     VLLM_MODELS = {model.strip(): MODEL_DEVICE_REQUIREMENTS[model.strip()] for model in VLLM_MODELS}
 
-print(f"LAUNCH_DOCKER: {LAUNCH_DOCKER}")
-print(f"LLM_BACKEND: {LLM_BACKEND}")
-print(f"OPENAI_MODELS: {OPENAI_MODELS}")
-print(f"OLLAMA_MODELS: {OLLAMA_MODELS}")
-print(f"VLLM_MODELS: {VLLM_MODELS}")
+logger.info(f"LAUNCH_DOCKER: {LAUNCH_DOCKER}")
+logger.info(f"LLM_BACKEND: {LLM_BACKEND}")
+logger.info(f"OPENAI_MODELS: {OPENAI_MODELS}")
+logger.info(f"OLLAMA_MODELS: {OLLAMA_MODELS}")
+logger.info(f"VLLM_MODELS: {VLLM_MODELS}")
 
 def format_yaml_value(value: any) -> str:
     """Format a value for YAML output."""
@@ -82,11 +84,11 @@ def validate_openai_key() -> Optional[str]:
     """Validate OpenAI API key from environment."""
     api_key = os.getenv('OPENAI_API_KEY')
     if not api_key:
-        print("No OPENAI_API_KEY found in environment")
+        logger.error("No OPENAI_API_KEY found in environment")
         return None
     
     if len(api_key) < 10:
-        print("OPENAI_API_KEY seems invalid (length < 10)")
+        logger.error("OPENAI_API_KEY seems invalid (length < 10)")
         return None
         
     return api_key
@@ -158,7 +160,7 @@ def generate_litellm_config() -> Dict:
                         }
                     })
             else:
-                print(f"Model {model} not found in MODEL_SERVICE_MAP")
+                logger.error(f"Model {model} not found in MODEL_SERVICE_MAP")
 
     # add api key at the bottom of the config
     config['general_settings'] = {
@@ -192,10 +194,10 @@ def count_available_gpus() -> int:
             text=True
         )
         gpu_list = [gpu for gpu in result.stdout.strip().split("\n") if gpu.strip()]
-        print(f"Found {len(gpu_list)} GPUs")
+        logger.info(f"Found {len(gpu_list)} GPUs")
         return len(gpu_list)
     except Exception as e:
-        print(f"Warning: Could not detect GPUs via nvidia-smi: {e}", file=sys.stderr)
+        logger.error(f"Warning: Could not detect GPUs via nvidia-smi: {e}")
         # Fallback to a default value
         return 8
     
@@ -208,10 +210,9 @@ def allocate_gpus(model_map):
     total_required = sum(model_map.values())
 
     if total_required > available_gpus:
-        print(
+        logger.error(
             f"Error: Insufficient GPUs available. The system has {available_gpus} GPUs, "
             f"but the selected models require a total of {total_required} GPUs.",
-            file=sys.stderr
         )
         sys.exit(1)
 
@@ -232,7 +233,7 @@ def main():
     output_path = script_dir / 'litellm_config.yml'
     
     if not config['model_list']:
-        print("Warning: No models configured.", file=sys.stderr)
+        logger.warning("Warning: No models configured.")
         # write an empty config to avoid LiteLLM 'config file not found error'
         yaml_content = dict_to_yaml({'model_list': []})
         with open(output_path, 'w') as f:
@@ -244,7 +245,7 @@ def main():
         with open(output_path, 'w') as f:
             f.write(yaml_content)
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        logger.error(f"Error: {e}")
         sys.exit(1)
 
     if LLM_BACKEND == "vllm":

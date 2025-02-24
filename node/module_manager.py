@@ -143,8 +143,8 @@ async def install_module_with_lock(module: Union[Dict, Module]):
         if installed_version == run_version:
             logger.info("Running poetry update")
             update_output = run_poetry_command(["update", f"{module_name}"])
-            logger.info(f"Update output: {update_output}")
-            logger.info(f"Module {module_name} version {run_version} is already installed")
+            logger.debug(f"Update output: {update_output}")
+            logger.debug(f"Module {module_name} version {run_version} is already installed")
             return True
 
     lock_file = Path(MODULES_SOURCE_DIR) / f"{module_name}.lock"
@@ -243,7 +243,7 @@ async def download_persona_from_ipfs(persona_url: str, personas_base_dir: Path):
             logger.info(f"Persona {persona_folder_name} already exists")
             # remove the directory
             shutil.rmtree(persona_dir)
-            logger.info(f"Removed existing persona directory: {persona_dir}")
+            logger.debug(f"Removed existing persona directory: {persona_dir}")
 
         persona_temp_zip_path = download_from_ipfs(persona_ipfs_hash, personas_base_dir)
         unzip_file(persona_temp_zip_path, persona_dir)
@@ -264,7 +264,7 @@ async def download_persona_from_git(repo_url: str, personas_base_dir: Path):
         if persona_dir.exists():
             # remove the directory
             shutil.rmtree(persona_dir)
-            logger.info(f"Removed existing persona directory: {persona_dir}")
+            logger.debug(f"Removed existing persona directory: {persona_dir}")
             # clone the repository again
             Repo.clone_from(repo_url, persona_dir)
             logger.info(f"Successfully cloned persona: {repo_name}")
@@ -283,7 +283,7 @@ async def download_persona_from_git(repo_url: str, personas_base_dir: Path):
 def install_module_from_ipfs(module_name: str, module_version: str, module_source_url: str):
     logger.info(f"Installing/updating module {module_name} version {module_version}")
     modules_source_dir = Path(MODULES_SOURCE_DIR) / module_name
-    logger.info(f"Module path exists: {modules_source_dir.exists()}")
+    logger.debug(f"Module path exists: {modules_source_dir.exists()}")
     try:
         module_ipfs_hash = module_source_url.split("ipfs://")[1]
         module_temp_zip_path = download_from_ipfs(module_ipfs_hash, MODULES_SOURCE_DIR)
@@ -294,38 +294,38 @@ def install_module_from_ipfs(module_name: str, module_version: str, module_sourc
         venv_dir = modules_source_dir / ".venv"
         if venv_dir.exists():
             shutil.rmtree(venv_dir)
-            logger.info(f"Removed existing venv directory: {venv_dir}")
+            logger.debug(f"Removed existing venv directory: {venv_dir}")
 
     except Exception as e:
         error_msg = f"Error installing {module_name}: {str(e)}"
         logger.error(error_msg)
-        logger.info(f"Traceback: {traceback.format_exc()}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         raise RuntimeError(error_msg) from e
 
 
 def install_module_from_git(module_name: str, module_version: str, module_source_url: str):
     logger.info(f"Installing/updating module {module_name} version {module_version}")
     modules_source_dir = Path(MODULES_SOURCE_DIR) / module_name
-    logger.info(f"Module path exists: {modules_source_dir.exists()}")
+    logger.debug(f"Module path exists: {modules_source_dir.exists()}")
     try:
         if modules_source_dir.exists():
-            logger.info(f"Updating existing repository for {module_name}")
+            logger.debug(f"Updating existing repository for {module_name}")
             repo = Repo(modules_source_dir)
             repo.remotes.origin.fetch()
             repo.git.checkout(module_version)
-            logger.info(f"Successfully updated {module_name} to version {module_version}")
+            logger.debug(f"Successfully updated {module_name} to version {module_version}")
         else:
             # Clone new repository
-            logger.info(f"Cloning new repository for {module_name}")
+            logger.debug(f"Cloning new repository for {module_name}")
             Repo.clone_from(module_source_url, modules_source_dir)
             repo = Repo(modules_source_dir)
             repo.git.checkout(module_version)
-            logger.info(f"Successfully cloned {module_name} version {module_version}")
+            logger.debug(f"Successfully cloned {module_name} version {module_version}")
 
     except Exception as e:
         error_msg = f"Error installing {module_name}: {str(e)}"
         logger.error(error_msg)
-        logger.info(f"Traceback: {traceback.format_exc()}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
         if "Dependency conflict detected" in str(e):
             error_msg += "\nThis is likely due to a mismatch in naptha-sdk versions between the module and the main project."
         raise RuntimeError(error_msg) from e
@@ -361,7 +361,7 @@ def run_poetry_command(command, module_name=None):
 def install_module(module_name: str, module_version: str, module_source_url: str):
     logger.info(f"Installing/updating module {module_name} version {module_version}")
     modules_source_dir = Path(MODULES_SOURCE_DIR) / module_name
-    logger.info(f"Module path exists: {modules_source_dir.exists()}")
+    logger.debug(f"Module path exists: {modules_source_dir.exists()}")
 
     try:
         if "ipfs://" in module_source_url:
@@ -378,8 +378,8 @@ def install_module(module_name: str, module_version: str, module_source_url: str
 
         # Capture stdout/stderr
         proc = subprocess.run(install_cmd, capture_output=True, text=True)
-        logger.info(f"Pip install stdout: {proc.stdout}")
-        logger.info(f"Pip install stderr: {proc.stderr}")
+        logger.debug(f"Pip install stdout: {proc.stdout}")
+        logger.debug(f"Pip install stderr: {proc.stderr}")
 
         if proc.returncode != 0:
             raise RuntimeError(f"Pip install failed: {proc.stderr}")
@@ -516,7 +516,8 @@ async def load_node_metadata(deployment):
     else:
         node_data = await list_nodes(deployment.node.ip)
     deployment.node = node_data
-    logger.info(f"Node metadata loaded {deployment.node}")
+    logger.info(f"Node metadata loaded")
+    logger.debug(f"Node metadata: {deployment.node}")
 
 async def load_module_config_data(deployment: Union[AgentDeployment, ToolDeployment, EnvironmentDeployment, KBDeployment, MemoryDeployment, OrchestratorDeployment], default_deployment: Dict):
     logger.info(f"Loading module config data for {deployment.module.name}")
@@ -546,7 +547,7 @@ async def load_module_config_data(deployment: Union[AgentDeployment, ToolDeploym
 
     # update deployment with merged config
     deployment.config = merged_config
-    logger.info(f"Module config data loaded {deployment.config}")
+    logger.debug(f"Module config data loaded {deployment.config}")
 
     if 'persona_module' in merged_config and merged_config['persona_module'] is not None:
         persona_module = merged_config['persona_module']
@@ -560,7 +561,7 @@ async def load_module_config_data(deployment: Union[AgentDeployment, ToolDeploym
 
 async def load_subdeployments(deployment, main_deployment_default):
     logger.info(f"Loading subdeployments for {main_deployment_default['module']['name']}")
-    logger.info(f"Main deployment default: {main_deployment_default}")
+    logger.debug(f"Main deployment default: {main_deployment_default}")
 
     module_path = Path(f"{MODULES_SOURCE_DIR}/{main_deployment_default['module']['name']}/{main_deployment_default['module']['name']}")
 
@@ -593,7 +594,7 @@ async def load_subdeployments(deployment, main_deployment_default):
             kb_deployment = await setup_module_deployment("kb", module_path / "configs/kb_deployments.json", deployment_name, deployment.kb_deployments[i])
             kb_deployments.append(kb_deployment)
         deployment.kb_deployments = kb_deployments
-    logger.info(f"Subdeployments loaded {deployment}")
+    logger.debug(f"Subdeployments loaded {deployment}")
     if hasattr(deployment, "memory_deployments") and deployment.memory_deployments:
         memory_deployments = []
         for i, memory_deployment in enumerate(deployment.memory_deployments):
@@ -601,12 +602,12 @@ async def load_subdeployments(deployment, main_deployment_default):
             memory_deployment = await setup_module_deployment("memory", module_path / "configs/memory_deployments.json", deployment_name, deployment.memory_deployments[i])
             memory_deployments.append(memory_deployment)
         deployment.memory_deployments = memory_deployments
-    logger.info(f"Subdeployments loaded {deployment}")
+    logger.debug(f"Subdeployments loaded {deployment}")
     return deployment
 
 async def setup_module_deployment(module_type: str, main_deployment_default_path: str, deployment_name: str, deployment: Union[AgentDeployment, ToolDeployment, EnvironmentDeployment, KBDeployment, OrchestratorDeployment]):
     logger.info(f"Setting up module deployment for {deployment_name}")
-    logger.info(f"Deployment: {deployment}")
+    logger.debug(f"Deployment: {deployment}")
 
     # Map deployment types to their corresponding classes
     deployment_map = {

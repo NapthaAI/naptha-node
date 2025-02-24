@@ -85,7 +85,7 @@ def monitor_container_logs(
 
 def cleanup_container(container: Container) -> None:
     """Cleanup a container"""
-    logger.info(f"Removing container: {container}")
+    logger.debug(f"Removing container: {container}")
     if container:
         container.stop()
         container.remove()
@@ -101,7 +101,7 @@ def run_container_agent(agent_run: AgentRun = None, **kwargs) -> None:
         agent_run.inputs.input_dir
         or agent_run.inputs.input_ipfs_hash
     ):
-        logger.info("Preparing input directory")
+        logger.debug("Preparing input directory")
         inp_vol = prepare_volume_directory(
             base_dir=BASE_OUTPUT_DIR,
             bind_path=agent_run.inputs.bind_input_dir,
