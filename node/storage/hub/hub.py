@@ -22,6 +22,7 @@ class HubDBSurreal(AsyncMixin):
             self.hub_url = LOCAL_HUB_URL
         else:
             self.hub_url = PUBLIC_HUB_URL
+
         self.ns = os.getenv("HUB_DB_SURREAL_NS")
         self.db = os.getenv("HUB_DB_SURREAL_NAME")
 

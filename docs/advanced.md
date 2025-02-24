@@ -65,7 +65,16 @@ Note that the `RMQ_*` variables will be passed in to create the default RMQ user
 
 ## Building the Docker Image
 
-The Naptha node uses a cross-platform Dockerfile intended for use with `docker buildx`. This is automatically used by Naptha's CI/CD, so when you pull the image, the right architecture will be used. To build the image with `docker buildx` yourself, you must first install Docker on your system. Once you have done that, complete the following steps to enable the `buildx` plugin:
+The Naptha node uses a platform-agnostic Dockerfile intended for use with `docker buildx`. 
+
+This is automatically used by Naptha's CI/CD, so when you pull the image from `napthaai/node:latest`, the right architecture will be available for your device, and will be pulled automatically. However, legacy `docker build` commands are automatically supported: 
+
+```shell
+docker build -t account/repository:tag -f Dockerfile-node .
+```
+
+
+To build the image with `docker buildx` yourself, you must first install Docker on your system. Once you have done that, complete the following steps to enable the `buildx` plugin:
 
 
 ```shell 
@@ -82,28 +91,33 @@ push the manifests up to your dockerhub / other container repo, since the local 
 does not support manifest lists for multi-platform builds. In that case, you need to specify a full container tag of 
 `account/repository:tag`
 
+To build the image for the architecture of your machine, run:
+
+```shell 
+docker buildx build \
+  -t account/repository:tag \
+  -f Dockerfile-node \
+  . --load 
+```
+
+Or, you can use the `--platform` flag to specify one or more specific architectures to build for.
+This can be useful for example if you want to build the node on an ARM machine (e.g. a M-series Macbook) 
+and then run it on a remote server with a different architecture.
+
 ```shell
 # for ARM CPUs only:
 docker buildx build \
-  --platform linux/arm64 \
+  --platform linux/arm64 # you can specify one or more target 
   -t example-docker-tag \
-  -f buildx.Dockerfile \
-  --load . 
+  -f Dockerfile-node \
+  . --load
   
 # for multiple target platforms:
 docker buildx build \
   --platform linux/arm64,linux/amd64 \
   -t account/repository:tag \
-  -f buildx.Dockerfile \ 
-  --push .
-
-
-# for GPU-accelerated inference with ollama or vLLM; use an nvidia/cuda base image. replace 12.4.1 with your CUDA version;
-# see https://hub.docker.com/r/nvidia/cuda/tags for a list of supported images.
-docker buildx build \
-    --platform linux/arm64 \
-    --build-arg BASE_IMAGE=nvidia/cuda:12.4.1-devel-ubuntu22.04 \ 
-    -t yourdockerprofile/yourrepo:yourtag \
-    -f buildx.Dockerfile \
-    --load .
+  -f Dockerfile-node \
+  . --load
 ```
+
+Remember that with `docker buildx`, images are not automatically added to your build cache. You can use `--load` to load the image into your local docker cache, or use `--push` to push the image to a remote container repository.
