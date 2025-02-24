@@ -225,7 +225,8 @@ class WebSocketServer:
             if not module_type:
                 raise HTTPException(status_code=400, detail="Invalid module deployment type")
 
-            logger.info(f"Creating {module_type}: {module_deployment}")
+            logger.info(f"Creating {module_type}")
+            logger.debug(f"{module_type}: {module_deployment}")
 
             main_module_name = module_deployment.module['name'] if isinstance(module_deployment.module, dict) else module_deployment.module.name
             main_module_path = Path(f"{MODULES_SOURCE_DIR}/{main_module_name}/{main_module_name}")
@@ -336,7 +337,7 @@ class WebSocketServer:
 
             config = module_configs[module_type]
             run_input = config["input_class"](**data)
-            logger.info(f"Received task: {run_input}")
+            logger.debug(f"Received task: {run_input}")
 
             if not run_input.deployment.initialized:
                 deployment = await self.create_module(run_input.deployment)

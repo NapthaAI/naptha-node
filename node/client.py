@@ -86,11 +86,11 @@ class Node:
 
         try:
             message = json.dumps(data)
-            logger.info(f"Sending message: {message}")
+            logger.debug(f"Sending message: {message}")
             await self.connections[client_id].send(message)
 
             response = await self.connections[client_id].recv()
-            logger.info(f"Received response: {response}")
+            logger.debug(f"Received response: {response}")
             return json.loads(response)
         finally:
             await self.disconnect_ws(client_id)
@@ -110,7 +110,7 @@ class Node:
             raise ValueError("Invalid server type")
 
     async def check_user(self, user_input):
-        print("Checking user... ", user_input)
+        logger.debug("Checking user... ", user_input)
         if self.communication_protocol == "http":
             return await self.check_user_http(user_input)
         elif self.communication_protocol == "ws":
@@ -154,8 +154,8 @@ class Node:
         """
         Run a agent on a node
         """
-        print("Running agent...")
-        print(f"Node URL: {self.node_url}")
+        logger.info("Running agent...")
+        logger.debug(f"Node URL: {self.node_url}")
 
         endpoint = self.node_url + "/agent/run"
 
@@ -174,14 +174,14 @@ class Node:
                 response.raise_for_status()
             return AgentRun(**json.loads(response.text))
         except HTTPStatusError as e:
-            logger.info(f"HTTP error occurred: {e}")
+            logger.error(f"HTTP error occurred: {e}")
             raise
         except RemoteProtocolError as e:
             error_msg = f"Run agent failed to connect to the server at {self.node_url}. Please check if the server URL is correct and the server is running. Error details: {str(e)}"
             logger.error(error_msg)
             raise
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+            logger.error(f"An unexpected error occurred: {e}")
             raise
 
     async def run_agent_ws(self, agent_run_input: AgentRunInput) -> AgentRun:
@@ -194,7 +194,7 @@ class Node:
         response = await self.send_receive_ws(data, "run_agent")
 
         if response["status"] == "success":
-            logger.info(f"Ran agent successfully: {response['data']}")
+            logger.debug(f"Ran agent successfully: {response['data']}")
             response["data"] = response["data"]
             return AgentRun(**response["data"])
         else:
@@ -206,7 +206,7 @@ class Node:
             self.communication_protocol == "http"
         ), "run_agent_and_poll should only be called for HTTP server type"
         agent_run = await self.run_agent_http(agent_run_input)
-        print(f"Agent run started: {agent_run}")
+        logger.info(f"Agent run started: {agent_run}")
 
         current_results_len = 0
         while True:
@@ -216,7 +216,7 @@ class Node:
             )
 
             if len(agent_run.results) > current_results_len:
-                print("Output: ", agent_run.results[-1])
+                logger.debug("Output: ", agent_run.results[-1])
                 current_results_len += 1
 
             if agent_run.status == "completed":
@@ -227,13 +227,13 @@ class Node:
             time.sleep(3)
 
         if agent_run.status == "completed":
-            print(agent_run.results)
+            logger.debug(agent_run.results)
         else:
-            print(agent_run.error_message)
+            logger.error(agent_run.error_message)
         return agent_run
 
     async def run_agent_grpc(self, agent_run_input: AgentRunInput) -> AgentRun:
-        logger.info(f"run_agent_grpc called with input: {agent_run_input}")
+        logger.debug(f"run_agent_grpc called with input: {agent_run_input}")
         try:
             async with self.get_stub() as stub:
                 # Convert agent_run_params to Struct
@@ -252,7 +252,7 @@ class Node:
                 start_time = datetime.now()
 
                 async for response in stub.RunAgent(request):
-                    logger.info(f"Received response: {response}")
+                    logger.debug(f"Received response: {response}")
                     response_dict = MessageToDict(
                         response, preserving_proto_field_name=True
                     )
@@ -289,31 +289,31 @@ class Node:
                 response.raise_for_status()
             return json.loads(response.text)
         except HTTPStatusError as e:
-            logger.info(f"HTTP error occurred: {e}")
+            logger.error(f"HTTP error occurred: {e}")
             raise
         except RemoteProtocolError as e:
             error_msg = f"Check user failed to connect to the server at {self.node_url}. Please check if the server URL is correct and the server is running. Error details: {str(e)}"
-            logger.info(error_msg)
+            logger.error(error_msg)
             raise
         except Exception as e:
-            logger.info(f"An unexpected error occurred: {e}")
+            logger.error(f"An unexpected error occurred: {e}")
             raise
 
     async def check_user_ws(self, user_input: Dict[str, str]):
         response = await self.send_receive_ws(user_input, "check_user")
-        logger.info(f"Check user response: {response}")
+        logger.debug(f"Check user response: {response}")
         return response
 
     async def check_user_grpc(self, user_input: Dict[str, Any]) -> Dict[str, Any]:
-        logger.info(f"check_user_grpc called with user_input: {user_input}")
+        logger.debug(f"check_user_grpc called with user_input: {user_input}")
         try:
             async with self.get_stub() as stub:
                 request = grpc_server_pb2.CheckUserRequest(
                     public_key=user_input["public_key"]
                 )
-                logger.info(f"Sending CheckUser request: {request}")
+                logger.debug(f"Sending CheckUser request: {request}")
                 response = await stub.CheckUser(request)
-                logger.info(f"Received CheckUser response: {response}")
+                logger.debug(f"Received CheckUser response: {response}")
                 return {
                     "id": response.id,
                     "public_key": response.public_key,
@@ -340,31 +340,31 @@ class Node:
                 response.raise_for_status()
             return json.loads(response.text)
         except HTTPStatusError as e:
-            logger.info(f"HTTP error occurred: {e}")
+            logger.error(f"HTTP error occurred: {e}")
             raise
         except RemoteProtocolError as e:
             error_msg = f"Register user failed to connect to the server at {self.node_url}. Please check if the server URL is correct and the server is running. Error details: {str(e)}"
             logger.error(error_msg)
             raise
         except Exception as e:
-            logger.info(f"An unexpected error occurred: {e}")
+            logger.error(f"An unexpected error occurred: {e}")
             raise
 
     async def register_user_ws(self, user_input: Dict[str, str]):
         response = await self.send_receive_ws(user_input, "register_user")
-        logger.info(f"Register user response: {response}")
+        logger.debug(f"Register user response: {response}")
         return response
 
     async def register_user_grpc(self, user_input: Dict[str, Any]) -> Dict[str, Any]:
-        logger.info(f"register_user_grpc called with user_input: {user_input}")
+        logger.debug(f"register_user_grpc called with user_input: {user_input}")
         try:
             async with self.get_stub() as stub:
                 request = grpc_server_pb2.RegisterUserRequest(
                     public_key=user_input["public_key"]
                 )
-                logger.info(f"Sending RegisterUser request: {request}")
+                logger.debug(f"Sending RegisterUser request: {request}")
                 response = await stub.RegisterUser(request)
-                logger.info(f"Received RegisterUser response: {response}")
+                logger.debug(f"Received RegisterUser response: {response}")
                 return {
                     "id": response.id,
                     "public_key": response.public_key,
@@ -385,11 +385,11 @@ class Node:
                 response.raise_for_status()
             return AgentRun(**json.loads(response.text))
         except HTTPStatusError as e:
-            logger.info(f"HTTP error occurred: {e}")
+            logger.error(f"HTTP error occurred: {e}")
             raise
         except Exception as e:
-            logger.info(f"An unexpected error occurred: {e}")
-            logger.info(f"Full traceback: {traceback.format_exc()}")
+            logger.error(f"An unexpected error occurred: {e}")
+            logger.error(f"Full traceback: {traceback.format_exc()}")
 
     async def send_receive_multiple(self, data_list, action: str):
         results = []
@@ -398,11 +398,11 @@ class Node:
             client_id = await self.connect_ws(action)
 
             message = json.dumps(data)
-            logger.info(f"Sending message: {message}")
+            logger.debug(f"Sending message: {message}")
             await self.connections[client_id].send(message)
 
             response = await self.connections[client_id].recv()
-            logger.info(f"Received response: {response}")
+            logger.debug(f"Received response: {response}")
             results.append(json.loads(response))
 
             await self.disconnect_ws(client_id)
@@ -447,15 +447,15 @@ class NodeIndirect:
 
         async with self.lock:
             message_json = json.dumps(message)
-            logger.info(f"Sending message: {message_json}")
+            logger.debug(f"Sending message: {message_json}")
             await websocket.send(message_json)
 
             response = await websocket.recv()
-            logger.info(f"Received raw response: {response}")
+            logger.debug(f"Received raw response: {response}")
 
         if isinstance(response, str):
             response_data = json.loads(response)
-            logger.info(f"Received response: {response_data}")
+            logger.debug(f"Received response: {response_data}")
         else:
             logger.error(f"Received non-string response: {response}")
             raise Exception("Received non-string response")
@@ -472,7 +472,7 @@ class NodeIndirect:
         response = await self.send_receive(data, "run_agent")
 
         if response["status"] == "success":
-            logger.info(f"Ran agent successfully: {response['data']}")
+            logger.debug(f"Ran agent successfully: {response['data']}")
             return AgentRun(**response["data"])
         else:
             logger.error(f"Error running agent: {response['message']}")
@@ -480,12 +480,12 @@ class NodeIndirect:
 
     async def check_user(self, user_input: Dict[str, str]):
         response = await self.send_receive(user_input, "check_user")
-        logger.info(f"Check user response: {response}")
+        logger.debug(f"Check user response: {response}")
         return response
 
     async def register_user(self, user_input: Dict[str, str]):
         response = await self.send_receive(user_input, "register_user")
-        logger.info(f"Register user response: {response}")
+        logger.debug(f"Register user response: {response}")
         return response
 
     async def close(self):

@@ -3,8 +3,10 @@ import os
 import platform
 import subprocess
 import sys
+import logging
 
 load_dotenv()
+logger = logging.getLogger(__name__)
 
 LOCAL_DB_POSTGRES_USERNAME = os.getenv("LOCAL_DB_POSTGRES_USERNAME")
 LOCAL_DB_POSTGRES_PASSWORD = os.getenv("LOCAL_DB_POSTGRES_PASSWORD")
@@ -12,7 +14,7 @@ LOCAL_DB_POSTGRES_NAME = os.getenv("LOCAL_DB_POSTGRES_NAME")
 LOCAL_DB_POSTGRES_PORT = os.getenv("LOCAL_DB_POSTGRES_PORT")
 
 def reset_db():
-    print("Starting database reset...")
+    logger.info("Starting database reset...")
     
     is_macos = platform.system() == 'Darwin'
     
@@ -38,7 +40,7 @@ def reset_db():
             f"sudo -u postgres psql -d template1 -c \"ALTER USER {LOCAL_DB_POSTGRES_USERNAME} CREATEDB;\""
         ]
 
-    print("Executing database commands...")
+    logger.info("Executing database commands...")
     for cmd in commands:
         try:
             result = subprocess.run(
@@ -49,17 +51,17 @@ def reset_db():
                 stderr=subprocess.PIPE,
                 text=True
             )
-            print(f"✓ {cmd}")
+            logger.debug(f"✓ {cmd}")
         except subprocess.CalledProcessError as e:
-            print(f"\nError executing: {cmd}")
-            print(f"Exit code: {e.returncode}")
+            logger.error(f"\nError executing: {cmd}")
+            logger.error(f"Exit code: {e.returncode}")
             if e.stdout:
-                print(f"stdout: {e.stdout}")
+                logger.error(f"stdout: {e.stdout}")
             if e.stderr:
-                print(f"stderr: {e.stderr}")
+                logger.error(f"stderr: {e.stderr}")
             sys.exit(1)
 
-    print("Database reset complete!")
+    logger.info("Database reset complete!")
 
 if __name__ == "__main__":
     reset_db()

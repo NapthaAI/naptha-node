@@ -106,7 +106,7 @@ def create_output_dir(base_output_dir):
 
 def run_subprocess(cmd: List) -> str:
     """Run a subprocess"""
-    logger.info(f"Running subprocess: {cmd}")
+    logger.debug(f"Running subprocess: {cmd}")
     try:
         process = subprocess.Popen(
             cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True
@@ -115,7 +115,7 @@ def run_subprocess(cmd: List) -> str:
 
         # Log the output
         if out:
-            logger.info(f"Subprocess output: {out}")
+            logger.debug(f"Subprocess output: {out}")
 
         # Check if there's any stderr output
         if err:
@@ -161,7 +161,7 @@ def add_credentials_to_env(username, password):
     with open(env_file_path, "w") as env_file:
         env_file.writelines(updated_lines)
 
-    print(
+    logger.info(
         "Your credentials have been updated in the .env file. You can now use these credentials to authenticate in future sessions."
     )
 
@@ -215,5 +215,5 @@ def get_node_config():
         ram=psutil.virtual_memory().total,
         vram=VRAM,
     )
-    print("Created node config:", node_config)
+    logger.debug("Created node config:", node_config)
     return node_config
