@@ -22,7 +22,7 @@ MODELS = os.getenv("VLLM_MODELS").split(",") if os.getenv("LLM_BACKEND") == "vll
 PROVIDER_TYPES=["models", "storage", "modules"]
 VRAM = 0 
 
-def setup_logging(default_level=logging.INFO):
+def setup_logging(logging_level=logging.INFO):
     """Setup logging configuration"""
     global _logging_initialized
     if _logging_initialized:
@@ -51,7 +51,7 @@ def setup_logging(default_level=logging.INFO):
         "loggers": {
             "": {  # root logger
                 "handlers": ["console"],
-                "level": default_level,
+                "level": logging_level,
                 "propagate": True,
             }
         },
