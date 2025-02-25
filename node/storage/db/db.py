@@ -180,7 +180,8 @@ class LocalDBPostgres:
                 db.add(run)
                 db.flush()
                 db.refresh(run)
-                logger.info(f"Created {run_type} run: {run.__dict__}")
+                logger.info(f"Created {run_type} run")
+                logger.debug(f"{run_type} run: {run.__dict__}")
                 return Schema(**run.__dict__)
         except SQLAlchemyError as e:
             logger.error(f"Failed to create {run_type} run: {str(e)}")
