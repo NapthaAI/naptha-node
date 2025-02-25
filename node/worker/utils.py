@@ -50,9 +50,9 @@ def handle_ipfs_input(ipfs_hash: str) -> str:
     try:
         unzip_file(Path(downloaded_path), Path(temp_dir))
         os.remove(downloaded_path)
-        logger.info(f"Unzipped file: {downloaded_path}")
+        logger.debug(f"Unzipped file: {downloaded_path}")
     except Exception:
-        logger.info(f"File is not a zip file: {downloaded_path}")
+        logger.error(f"File is not a zip file: {downloaded_path}")
     if os.path.isdir(os.path.join(temp_dir, ipfs_hash)):
         return os.path.join(temp_dir, ipfs_hash)
     else:
@@ -64,7 +64,7 @@ def upload_to_ipfs(input_dir: str) -> str:
     logger.info(f"Uploading to IPFS: {input_dir}")
     client = ipfshttpclient.connect(IPFS_GATEWAY_URL)
     res = client.add(input_dir, recursive=True)
-    logger.info(f"IPFS add response: {res}")
+    logger.debug(f"IPFS add response: {res}")
     ipfs_hash = res[-1]["Hash"]
     client.pin.add(ipfs_hash)
     return ipfs_hash
@@ -75,7 +75,7 @@ def upload_json_string_to_ipfs(json_string: str) -> str:
     logger.info("Uploading json string to IPFS")
     client = ipfshttpclient.connect(IPFS_GATEWAY_URL)
     res = client.add_str(json_string)
-    logger.info(f"IPFS add response: {res}")
+    logger.debug(f"IPFS add response: {res}")
     client.pin.add(res)
     return res
 
