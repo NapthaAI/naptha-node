@@ -51,7 +51,7 @@ class NodeServer:
                         await hub.delete_node(node_id=node_id)
                         logger.info(f"Cleaned up existing node registration: {node_id}")
                     except Exception as e:
-                        logger.info(f"No existing node to clean up: {e}")
+                        logger.error(f"No existing node to clean up: {e}")
                     
                     # Create http server records first
                     server_records = []
@@ -72,7 +72,7 @@ class NodeServer:
                             "port": self.node_config.servers[i].port
                         })
 
-                    logger.info(f"Server records: {server_records}")
+                    logger.debug(f"Server records: {server_records}")
 
                     # Now register the node
                     self.node_config = await hub.create_node(node_config=self.node_config, servers=server_records)
@@ -207,7 +207,7 @@ class NodeServer:
             logger.error(f"Error during {self.communication_protocol} server shutdown: {e}")
         finally:
             # Give time for cleanup operations to complete
-            logger.info("Cleanup delay before exit...")
+            logger.debug("Cleanup delay before exit...")
             await asyncio.sleep(1)
             logger.info(f"Forcing exit of {self.communication_protocol} server...")
             os._exit(0)
