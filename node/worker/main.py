@@ -15,6 +15,8 @@ PRIVATE_KEY = os.environ.get("PRIVATE_KEY")
 PRIVATE_KEY = os.path.abspath(PRIVATE_KEY)
 os.environ["PRIVATE_KEY_FULL_PATH"] = PRIVATE_KEY
 
+NODE_COMMUNICATION_PROTOCOL = os.environ.get("NODE_COMMUNICATION_PROTOCOL")
+
 def log_system_limits():
     """Log current system limits and resource usage"""
     try:
@@ -59,78 +61,78 @@ BUFFER_SIZE = 20
 
 logger.info(f"Configuration loaded:")
 logger.info(f"✓ BROKER_URL configured: {BROKER_URL}")
-logger.info(f"✓ NUM_GRPC_CONNECTIONS: {NUM_GRPC_CONNECTIONS}")
-logger.info(f"✓ BUFFER_SIZE: {BUFFER_SIZE}")
+if NODE_COMMUNICATION_PROTOCOL == "grpc":
+    logger.info(f"✓ NUM_GRPC_CONNECTIONS: {NUM_GRPC_CONNECTIONS}")
+    logger.info(f"✓ BUFFER_SIZE: {BUFFER_SIZE}")
 
 @worker_init.connect
 def initialize_grpc_pool(**kwargs):
     """Initializes the GlobalGrpcPool when a Celery worker starts."""
-    logger.info("Starting GlobalGrpcPool initialization...")
-    
-    try:
-        pool = get_grpc_pool_instance(
-            max_channels=NUM_GRPC_CONNECTIONS, buffer_size=BUFFER_SIZE
-        )
-        logger.info(f"✓ gRPC pool created with {NUM_GRPC_CONNECTIONS} max channels")
-
-        # Set up event loop
+    if NODE_COMMUNICATION_PROTOCOL == "grpc":
+        logger.info("Starting GlobalGrpcPool initialization...")
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_closed():
-                logger.info("Creating new event loop as current one is closed")
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-            
-            loop.create_task(pool.monitor_pool())
-            logger.info("✓ Pool monitor task created successfully")
-            
+            pool = get_grpc_pool_instance(
+                max_channels=NUM_GRPC_CONNECTIONS, buffer_size=BUFFER_SIZE
+            )
+            logger.info(f"✓ gRPC pool created with {NUM_GRPC_CONNECTIONS} max channels")
+
+            # Set up event loop
+            try:
+                loop = asyncio.get_event_loop()
+                if loop.is_closed():
+                    logger.info("Creating new event loop as current one is closed")
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                
+                loop.create_task(pool.monitor_pool())
+                logger.info("✓ Pool monitor task created successfully")
+                
+            except Exception as e:
+                logger.error(f"✗ Event loop setup failed: {e}")
+                raise
+
+            log_system_limits()
+            logger.info("✓ GlobalGrpcPool initialization complete")
         except Exception as e:
-            logger.error(f"✗ Event loop setup failed: {e}")
+            logger.error(f"✗ Failed to initialize GlobalGrpcPool: {e}")
             raise
-
-        log_system_limits()
-        logger.info("✓ GlobalGrpcPool initialization complete")
-
-    except Exception as e:
-        logger.error(f"✗ Failed to initialize GlobalGrpcPool: {e}")
-        raise
 
 @worker_shutdown.connect
 def shutdown_grpc_pool_signal(**kwargs):
     """Shuts down the GlobalGrpcPool when a Celery worker stops."""
-    logger.info("Starting GlobalGrpcPool shutdown...")
-    
-    try:
-        # Get or create event loop
+    if NODE_COMMUNICATION_PROTOCOL == "grpc":
+        logger.info("Starting GlobalGrpcPool shutdown...")
         try:
-            loop = asyncio.get_event_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            # Get or create event loop
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
 
-        if loop.is_closed():
-            logger.warning("Event loop was closed, creating new one for shutdown")
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+            if loop.is_closed():
+                logger.warning("Event loop was closed, creating new one for shutdown")
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
 
-        logger.info("Closing gRPC pool connections...")
-        # Create a new task for cleanup
-        cleanup_task = loop.create_task(close_grpc_pool())
-        loop.run_until_complete(cleanup_task)
-        
-        log_system_limits()
-        logger.info("✓ GlobalGrpcPool shutdown complete")
-        
-    except Exception as e:
-        logger.error(f"✗ Error during gRPC pool shutdown: {e}")
-        logger.error(f"Traceback: {traceback.format_exc()}")
-        raise
-    finally:
-        try:
-            if not loop.is_closed():
-                loop.close()
+            logger.info("Closing gRPC pool connections...")
+            # Create a new task for cleanup
+            cleanup_task = loop.create_task(close_grpc_pool())
+            loop.run_until_complete(cleanup_task)
+            
+            log_system_limits()
+            logger.info("✓ GlobalGrpcPool shutdown complete")
+            
         except Exception as e:
-            logger.error(f"Error closing event loop: {e}")
+            logger.error(f"✗ Error during gRPC pool shutdown: {e}")
+            logger.error(f"Traceback: {traceback.format_exc()}")
+            raise
+        finally:
+            try:
+                if not loop.is_closed():
+                    loop.close()
+            except Exception as e:
+                logger.error(f"Error closing event loop: {e}")
 
 # Celery app
 app = Celery(
@@ -165,7 +167,6 @@ def capture_worker_settings(sender, instance, **kwargs):
     """Log worker settings after setup is complete"""
     logger.info(f"Worker {sender} initialized with settings:")
     logger.info(f"✓ Concurrency: {instance.concurrency}")
-    logger.info(f"✓ Pool: {instance.pool}")
     logger.info(f"✓ Consumer: {instance.consumer}")
     log_system_limits()
 

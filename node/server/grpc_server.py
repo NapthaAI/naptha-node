@@ -173,9 +173,11 @@ class GrpcServerServicer(grpc_server_pb2_grpc.GrpcServerServicer):
             run_input = config["input_class"](**request_dict)
             run_input.inputs = request_dict.get('inputs', {})
 
-            if not run_input.deployment.initialized:
-                deployment = await self.create_module(run_input.deployment)
-                run_input.deployment = deployment
+            logger.debug(f"Run input: {run_input}")
+
+            # if not run_input.deployment.initialized:
+            #     deployment = await self.create_module(run_input.deployment)
+            #     run_input.deployment = deployment
 
             async with LocalDBPostgres() as db:
                 module_run = await config["db_create"](db, run_input)
@@ -380,13 +382,13 @@ class GrpcServer:
         self.shutdown_event = asyncio.Event()
 
         options = [
-            ("grpc.max_send_message_length", 100 * 1024 * 1024),  # 100MB
-            ("grpc.max_receive_message_length", 100 * 1024 * 1024),  # 100MB
-            ("grpc.keepalive_time_ms", 60 * 1000),  # 60 seconds
-            ("grpc.keepalive_timeout_ms", 60 * 1000),  # 60 seconds
+            ("grpc.max_send_message_length", 100 * 1024 * 1024),
+            ("grpc.max_receive_message_length", 100 * 1024 * 1024),
+            ("grpc.keepalive_time_ms", 30 * 60 * 1000),       # 30 minutes
+            ("grpc.keepalive_timeout_ms", 30 * 60 * 1000),     # 30 minutes
             ("grpc.http2.max_pings_without_data", 0),
-            ("grpc.http2.min_time_between_pings_ms", 60 * 1000),  # 60 seconds
-            ("grpc.max_connection_idle_ms", 60 * 60 * 1000),  # 1 hour
+            ("grpc.http2.min_time_between_pings_ms", 30 * 60 * 1000),  # 30 minutes
+            ("grpc.max_connection_idle_ms", 60 * 60 * 1000),   # 1 hour
             ("grpc.max_connection_age_ms", 2 * 60 * 60 * 1000),  # 2 hours
         ]
 
