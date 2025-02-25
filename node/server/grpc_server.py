@@ -173,7 +173,7 @@ class GrpcServerServicer(grpc_server_pb2_grpc.GrpcServerServicer):
             run_input = config["input_class"](**request_dict)
             run_input.inputs = request_dict.get('inputs', {})
 
-            logger.info(f"Run input: {run_input}")
+            logger.debug(f"Run input: {run_input}")
 
             # if not run_input.deployment.initialized:
             #     deployment = await self.create_module(run_input.deployment)
