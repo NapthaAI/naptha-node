@@ -3,10 +3,12 @@ import httpx
 import logging
 import traceback
 from datetime import datetime
-from typing import Union, Any, Dict
+from typing import Union, Any, Dict, List, Optional
 import uvicorn
-from dotenv import load_dotenv
-from fastapi import FastAPI, APIRouter, HTTPException, Request
+import os
+import base64
+from dotenv import load_dotenv, dotenv_values
+from fastapi import FastAPI, APIRouter, HTTPException, Request, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
@@ -37,6 +39,7 @@ from node.schemas import (
     KBRun,
     ModuleExecutionType,
     ToolDeployment,
+    SecretInput
 )
 from node.storage.db.db import LocalDBPostgres
 from node.storage.hub.hub import HubDBSurreal
@@ -46,7 +49,7 @@ from node.worker.package_worker import run_agent, run_tool, run_environment, run
 from node.client import Node as NodeClient
 from node.storage.server import router as storage_router
 from node.inference.server import router as inference_router
-import os
+from node.secret import Secret
 
 logger = logging.getLogger(__name__)
 load_dotenv()
@@ -61,6 +64,7 @@ LITELLM_URL = "http://litellm:4000" if os.getenv("LAUNCH_DOCKER") == "true" else
 if not LITELLM_MASTER_KEY:
     raise Exception("Missing LITELLM_MASTER_KEY for authentication")
 
+
 class TransientDatabaseError(Exception):
     pass
 
@@ -73,6 +77,7 @@ class HTTPServer:
         router = APIRouter()
         self.server = None
         self.should_exit = False
+        self.secret = Secret()
 
         @self.app.on_event("shutdown")
         async def shutdown_event():
@@ -98,6 +103,15 @@ class HTTPServer:
                     "body": await request.json()
                 }
             )
+        
+        @router.get("/.well-known/jwks.json")
+        async def get_public_key():
+            try:
+                jwk = self.secret.get_public_key()
+
+                return {"keys" : [jwk]}
+            except Exception as e:
+                return {"error": f"Error retrieving public key: {str(e)}"}
 
         @router.post("/agent/create")
         async def agent_create_endpoint(agent_input: AgentDeployment) -> AgentDeployment:
@@ -109,13 +123,14 @@ class HTTPServer:
             return await self.agent_create(agent_input)
 
         @router.post("/agent/run")
-        async def agent_run_endpoint(agent_run_input: AgentRunInput) -> AgentRun:
+        async def agent_run_endpoint(agent_run_input: AgentRunInput, secrets: List[SecretInput] = []) -> AgentRun:
             """
             Run an agent
             :param agent_run_input: Agent run specifications
+            :param secrets: Optional list of secrets to pass to the agent
             :return: Status
             """
-            return await self.agent_run(agent_run_input)
+            return await self.agent_run(agent_run_input, secrets)
 
         @router.post("/agent/check") 
         async def agent_check_endpoint(agent_run: AgentRun) -> AgentRun:
@@ -136,13 +151,14 @@ class HTTPServer:
             return await self.tool_create(tool_input)
 
         @router.post("/tool/run")
-        async def tool_run_endpoint(tool_run_input: ToolRunInput) -> ToolRun:
+        async def tool_run_endpoint(tool_run_input: ToolRunInput, secrets: List[SecretInput] = []) -> ToolRun:
             """
             Run a tool
             :param tool_run_input: Tool run specifications
+            :param secrets: Optional list of secrets to pass to the tool
             :return: Status
             """
-            return await self.tool_run(tool_run_input)
+            return await self.tool_run(tool_run_input, secrets)
 
         @router.post("/tool/check")
         async def tool_check_endpoint(tool_run: ToolRun) -> ToolRun:
@@ -163,13 +179,14 @@ class HTTPServer:
             return await self.orchestrator_create(orchestrator_input)
         
         @router.post("/orchestrator/run")
-        async def orchestrator_run_endpoint(orchestrator_run_input: OrchestratorRunInput) -> OrchestratorRun:
+        async def orchestrator_run_endpoint(orchestrator_run_input: OrchestratorRunInput, secrets: List[SecretInput] = []) -> OrchestratorRun:
             """
             Run an agent orchestrator
             :param orchestrator_run_input: Orchestrator run specifications
+            :param secrets: Optional list of secrets to pass to the orchestrator
             :return: Status
             """
-            return await self.orchestrator_run(orchestrator_run_input)
+            return await self.orchestrator_run(orchestrator_run_input, secrets)
 
         @router.post("/orchestrator/check")
         async def orchestrator_check_endpoint(orchestrator_run: OrchestratorRun) -> OrchestratorRun:
@@ -190,13 +207,14 @@ class HTTPServer:
             return await self.environment_create(environment_input)
 
         @router.post("/environment/run")
-        async def environment_run_endpoint(environment_run_input: EnvironmentRunInput) -> EnvironmentRun:
+        async def environment_run_endpoint(environment_run_input: EnvironmentRunInput, secrets: List[SecretInput] = []) -> EnvironmentRun:
             """
             Run an environment
             :param environment_run_input: Environment run specifications 
+            :param secrets: Optional list of secrets to pass to the environment
             :return: Status
             """
-            return await self.environment_run(environment_run_input)
+            return await self.environment_run(environment_run_input, secrets)
 
         @router.post("/environment/check")
         async def environment_check_endpoint(environment_run: EnvironmentRun) -> EnvironmentRun:
@@ -217,13 +235,14 @@ class HTTPServer:
             return await self.kb_create(kb_input)
         
         @router.post("/kb/run")
-        async def kb_run_endpoint(kb_run_input: KBRunInput) -> KBRun:
+        async def kb_run_endpoint(kb_run_input: KBRunInput, secrets: List[SecretInput] = []) -> KBRun:
             """
             Run a knowledge base
             :param kb_run_input: KBRunInput
+            :param secrets: Optional list of secrets to pass to the knowledge base
             :return: KBRun
             """
-            return await self.kb_run(kb_run_input)
+            return await self.kb_run(kb_run_input, secrets)
 
         @router.post("/kb/check")
         async def kb_check_endpoint(kb_run: KBRun) -> KBRun:
@@ -244,13 +263,14 @@ class HTTPServer:
             return await self.memory_create(memory_input)
 
         @router.post("/memory/run")
-        async def memory_run_endpoint(memory_run_input: MemoryRunInput) -> MemoryRun:
+        async def memory_run_endpoint(memory_run_input: MemoryRunInput, secrets: List[SecretInput] = [] ) -> MemoryRun:
             """
             Run a memory module
             :param memory_run_input: Memory run specifications
+            :param secrets: Optional list of secrets to pass to the memory
             :return: Status
             """
-            return await self.memory_run(memory_run_input)
+            return await self.memory_run(memory_run_input, secrets)
 
         @router.post("/memory/check")
         async def memory_check_endpoint(memory_run: MemoryRun) -> MemoryRun:
@@ -277,6 +297,35 @@ class HTTPServer:
             if '_sa_instance_state' in response:
                 response.pop('_sa_instance_state')
             return response
+        
+        @router.post("/user/secret/create")
+        async def user_secret_create_endpoint(
+            existing_secrets: List[SecretInput] = [], 
+            secrets: List[SecretInput] = [], 
+            signature: str = Query(...), 
+            is_update: Optional[bool] = Query(False)
+        ):
+            user_id = secrets[0].user_id.replace("<record>", "") if secrets else ""
+            
+            if not user_id:
+                raise HTTPException(status_code=400, detail=f"Data cannot be empty")
+            
+            if not verify_signature(user_id, signature, user_id.split(":")[1]):
+                raise HTTPException(status_code=401, detail="Unauthorized: Invalid signature")
+            
+            try:
+                aes_secret = base64.b64decode(os.getenv("AES_SECRET"))
+                for data in secrets:
+                    rsa_decrypted_secret_value = self.secret.decrypt_rsa(data.secret_value)
+                    encrypted_secret_value = self.secret.encrypt_with_aes(rsa_decrypted_secret_value, aes_secret)
+                    data.secret_value = encrypted_secret_value
+                
+                async with HubDBSurreal() as hub:
+                    result = await hub.create_secret(secrets, is_update, existing_secrets)
+                
+                return result
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Error processing secrets: {str(e)}")
 
         async def get_server_connection(self, server_id: str):
             """
@@ -367,7 +416,8 @@ class HTTPServer:
 
     async def run_module(
         self, 
-        module_run_input: Union[AgentRunInput, MemoryRunInput, OrchestratorRunInput, EnvironmentRunInput, ToolRunInput]
+        module_run_input: Union[AgentRunInput, MemoryRunInput, OrchestratorRunInput, EnvironmentRunInput, ToolRunInput],
+        secrets: List[SecretInput] = []
     ) -> Union[AgentRun, MemoryRun, OrchestratorRun, EnvironmentRun, ToolRun]:
         """
         Generic method to run either an agent, memory, orchestrator, environment, tool, kb, or memory
@@ -404,6 +454,13 @@ class HTTPServer:
 
             if not verify_signature(module_run_input.consumer_id, module_run_input.signature, user_public_key):
                 raise HTTPException(status_code=401, detail="Unauthorized: Invalid signature")
+            
+            user_env_data = {}
+            secret = Secret()
+                    
+            for record in secrets:
+                decrypted_value = secret.decrypt_with_aes(record.secret_value, base64.b64decode(os.getenv("AES_SECRET")))
+                user_env_data[record.key_name] = decrypted_value
 
             # Create module run record in DB
             async with LocalDBPostgres() as db:
@@ -419,17 +476,17 @@ class HTTPServer:
             # Execute the task based on module type
             if module_run_input.deployment.module.execution_type == ModuleExecutionType.package:
                 if module_type == "agent":
-                    _ = run_agent.delay(module_run_data)
+                    _ = run_agent.delay(module_run_data, user_env_data)
                 elif module_type == "tool":
-                    _ = run_tool.delay(module_run_data)
+                    _ = run_tool.delay(module_run_data, user_env_data)
                 elif module_type == "orchestrator":
-                    _ = run_orchestrator.delay(module_run_data)
+                    _ = run_orchestrator.delay(module_run_data, user_env_data)
                 elif module_type == "environment":
-                    _ = run_environment.delay(module_run_data)
+                    _ = run_environment.delay(module_run_data, user_env_data)
                 elif module_type == "kb":
-                    _ = run_kb.delay(module_run_data)
+                    _ = run_kb.delay(module_run_data, user_env_data)
                 elif module_type == "memory":
-                    _ = run_memory.delay(module_run_data)                   
+                    _ = run_memory.delay(module_run_data, user_env_data)                   
             elif module_run_input.deployment.module.execution_type == ModuleExecutionType.docker and module_type == "agent":
                 # validate docker params
                 try:
@@ -478,23 +535,23 @@ class HTTPServer:
         memory_deployment.module['module_type'] = "memory"
         return await self.create_module(memory_deployment)
 
-    async def agent_run(self, agent_run_input: AgentRunInput) -> AgentRun:
-        return await self.run_module(agent_run_input)
+    async def agent_run(self, agent_run_input: AgentRunInput, secrets: List[SecretInput] = []) -> AgentRun:
+        return await self.run_module(agent_run_input, secrets)
 
-    async def tool_run(self, tool_run_input: ToolRunInput) -> ToolRun:
-        return await self.run_module(tool_run_input)
+    async def tool_run(self, tool_run_input: ToolRunInput, secrets: List[SecretInput] = []) -> ToolRun:
+        return await self.run_module(tool_run_input, secrets)
 
-    async def orchestrator_run(self, orchestrator_run_input: OrchestratorRunInput) -> OrchestratorRun:
-        return await self.run_module(orchestrator_run_input)
+    async def orchestrator_run(self, orchestrator_run_input: OrchestratorRunInput, secrets: List[SecretInput] = []) -> OrchestratorRun:
+        return await self.run_module(orchestrator_run_input, secrets)
 
-    async def environment_run(self, environment_run_input: EnvironmentRunInput) -> EnvironmentRun:
-        return await self.run_module(environment_run_input)
+    async def environment_run(self, environment_run_input: EnvironmentRunInput, secrets: List[SecretInput] = []) -> EnvironmentRun:
+        return await self.run_module(environment_run_input, secrets)
 
-    async def kb_run(self, kb_run_input: KBRunInput) -> KBRun:
-        return await self.run_module(kb_run_input)
+    async def kb_run(self, kb_run_input: KBRunInput, secrets: List[SecretInput] = []) -> KBRun:
+        return await self.run_module(kb_run_input, secrets)
 
-    async def memory_run(self, memory_run_input: MemoryRunInput) -> MemoryRun:
-        return await self.run_module(memory_run_input)
+    async def memory_run(self, memory_run_input: MemoryRunInput, secrets: List[SecretInput] = []) -> MemoryRun:
+        return await self.run_module(memory_run_input, secrets)
 
     async def check_module(
         self, 

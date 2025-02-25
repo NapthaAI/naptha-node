@@ -38,20 +38,28 @@ The images will be pulled from `napthaai/node:latest` on Docker hub. It will not
 The docker compose runs in detached mode, so you can use `docker compose logs -f` to see the logs of the node. You can check the logs of individual services using:
 
 ```bash
-docker <service_name> logs -f
+docker logs -f <container_id>
 ```
 
-where `<service_name>` is the name of the service you want to check the logs of e.g. `node-app`, `litellm`, `node-ollama`, `Hermes-3-Llama-3.1-8B`, `node-pgvector`, etc. You can run `docker ps -a` to see the names of all the services running in docker compose.
+where `<container_id>` is the id of the service you want to check the logs of. You can get a list of all currently-running containers and their IDs by running `docker ps`. 
+Some containers in the compose configuration have human-readable `container_name` fields set, e.g. `node-app`, `litellm`, `node-ollama`, `Hermes-3-Llama-3.1-8B`, `node-pgvector`, etc. in which can you can run 
+
+```bash 
+docker logs -f <container_name>
+```
 
 ### Accessing a Service's Container
 
-To explore a service's filesystem or run commands inside a container, you can use:
+To run commands inside a container using an interactive shell, e.g. to explore the filesystem, you can use:
 
 ```bash
-docker exec -it <service_name> /bin/bash
+docker exec -it <container_id> /bin/bash
+
+# or, for some containers that don't have bash:
+docker exec -it <container_id> /bin/sh
 ```
 
-and `exit` to exit the container.
+Then, you can run `exit` to exit the shell inside the container when you are finished. This will not stop the container, it will just exit the shell.
 
 ## Stopping the Node
 
@@ -60,6 +68,10 @@ To stop the node, you can use:
 ```bash
 bash docker-ctl.sh down
 ```
+
+This script is _auto-generated_ by `launch.sh` and is used to stop the node and remove the containers. It will not be present in the repository until you start the node with `launch.sh`.
+
+Note that by default, this will _not_ remove persistant volumes created by certain containers, e.g. the postgres database and the rabbitMQ server. If you want to remove these volumes, you can run `docker volume ls` and `docker volume rm` to find, list, and remove the volume(s) that you want to remove. 
 
 
 

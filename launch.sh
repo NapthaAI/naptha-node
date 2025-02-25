@@ -2077,7 +2077,7 @@ launch_docker() {
 #!/bin/bash
 case "\$1" in
     "down")
-        env \$(cat .env | grep -v '^#' | xargs) $GPU_ASSIGNMENTS docker compose -f docker-compose.yml $COMPOSE_FILES down -v
+        env \$(cat .env | grep -v '^#' | xargs) $GPU_ASSIGNMENTS docker compose -f docker-compose.yml $COMPOSE_FILES down 
         ;;
     "logs")
         env \$(cat .env | grep -v '^#' | xargs) $GPU_ASSIGNMENTS docker compose -f docker-compose.yml $COMPOSE_FILES logs -f
@@ -2096,7 +2096,7 @@ EOF
 #!/bin/bash
 case "\$1" in
     "down")
-        docker compose -f docker-compose.yml $COMPOSE_FILES down -v
+        docker compose -f docker-compose.yml $COMPOSE_FILES down
         ;;
     "logs")
         docker compose -f docker-compose.yml $COMPOSE_FILES logs -f
