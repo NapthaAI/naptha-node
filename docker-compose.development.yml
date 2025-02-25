@@ -1,0 +1,114 @@
+# Development version of docker-compose with live reload capabilities
+# this is used when DOCKER_DEV_MODE=true
+services:
+  rabbitmq:
+    image: rabbitmq:4-alpine
+    container_name: node-rabbitmq
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RMQ_USER:?error}
+      RABBITMQ_DEFAULT_PASS: ${RMQ_PASSWORD:?error}
+      RABBITMQ_DEFAULT_VHOST: '/'
+      RABBITMQ_MANAGEMENT_PASSWORD: ${RMQ_PASSWORD:?error}
+    restart: unless-stopped
+    healthcheck:
+      test: rabbitmq-diagnostics check_port_connectivity
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - '5672:5672'
+      - '15672:15672' # management port enabled in dev mode
+    networks:
+      - naptha-network
+
+  pgvector:
+    image: pgvector/pgvector:pg17
+    container_name: node-pgvector
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init.sh:/docker-entrypoint-initdb.d/init.sh
+    environment:
+      - POSTGRES_USER=${LOCAL_DB_POSTGRES_USERNAME:?error}
+      - POSTGRES_PASSWORD=${LOCAL_DB_POSTGRES_PASSWORD:?error}
+      - PGUSER=${LOCAL_DB_POSTGRES_USERNAME:?error}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LOCAL_DB_POSTGRES_USERNAME} -d postgres"]
+      interval: "30s"
+      timeout: "10s"
+      retries: 5
+      start_period: "40s"
+    ports:
+      - '5433:5432'
+    networks:
+      - naptha-network
+
+  node-app:
+    container_name: node-app
+    build:
+      context: .
+      dockerfile: Dockerfile-node-dev
+    env_file:
+      - ./.env
+    volumes:
+      - ./node:/app/node  # Mount entire node directory for development
+      - ./node/config.py:/app/node/config/config.py
+      - ./node/storage/db/alembic/versions:/app/node/storage/db/alembic/versions
+      - ./node/storage/fs:/app/node/storage/fs
+      - ./node/storage/hub/modules:/app/node/storage/hub/modules
+      - ./${PRIVATE_KEY}:/app/${PRIVATE_KEY}
+    # No restart in dev mode for easier debugging
+    depends_on:
+      pgvector:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./node
+          target: /app/node
+          ignore:
+            - ./node/inference/ollama
+            - ./node/storage/db/alembic
+        - action: rebuild
+          path: pyproject.toml
+        - action: rebuild
+          path: poetry.lock
+        - action: rebuild
+          path: .env
+    ports:
+      - '7001:7001'
+      - '7002:7002'
+    networks:
+      - naptha-network
+
+  litellm:
+    container_name: litellm
+    image: ghcr.io/berriai/litellm:main-latest
+    command: --config /app/config.yaml
+    restart: unless-stopped
+    depends_on:
+      pgvector:
+        condition: service_healthy
+    environment:
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY:?error}
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY:?error}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      DATABASE_URL: postgresql://${LOCAL_DB_POSTGRES_USERNAME:?error}:${LOCAL_DB_POSTGRES_PASSWORD:?error}@pgvector:5432/litellm
+    volumes:
+      - ./node/inference/litellm/litellm_config.yml:/app/config.yaml
+    ports:
+      - '4000:4000'
+    networks:
+      - naptha-network
+
+volumes:
+  rabbitmq_data:
+  postgres_data:
+
+networks:
+  naptha-network:
+    driver: bridge

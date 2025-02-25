@@ -2037,6 +2037,15 @@ launch_docker() {
         set +a
     fi
 
+    # Check if development mode is enabled
+    if [[ "$DOCKER_DEV_MODE" == "true" ]]; then
+        echo "Running in development mode with Dockerfile-node-dev..." | log_with_service_name "Docker" "$BLUE"
+        COMPOSE_BASE_FILE="docker-compose.development.yml"
+    else
+        echo "Running in production mode with napthaai/node:latest image..." | log_with_service_name "Docker" "$BLUE"
+        COMPOSE_BASE_FILE="docker-compose.yml"
+    fi
+
     if [[ "$LLM_BACKEND" == "ollama" ]]; then
         python node/inference/litellm/generate_litellm_config.py
         COMPOSE_FILES+=" -f ${COMPOSE_DIR}/ollama.yml"
@@ -2070,17 +2079,21 @@ launch_docker() {
 
     docker network inspect naptha-network >/dev/null 2>&1 || docker network create naptha-network
 
-    echo "Starting services..."
+    # Store compose command base for reuse
     if [[ "$LLM_BACKEND" == "vllm" ]]; then
-        env $(cat .env | grep -v '^#' | xargs) $GPU_ASSIGNMENTS docker compose -f docker-compose.yml $COMPOSE_FILES up -d
+        COMPOSE_CMD="env \$(cat .env | grep -v '^#' | xargs) $GPU_ASSIGNMENTS docker compose -f $COMPOSE_BASE_FILE $COMPOSE_FILES"
+        # Start the containers
+        $COMPOSE_CMD up -d
+        
+        # Create docker-ctl.sh script for VLLM mode
         cat > docker-ctl.sh << EOF
 #!/bin/bash
 case "\$1" in
     "down")
-        env \$(cat .env | grep -v '^#' | xargs) $GPU_ASSIGNMENTS docker compose -f docker-compose.yml $COMPOSE_FILES down 
+        env \$(cat .env | grep -v '^#' | xargs) $GPU_ASSIGNMENTS docker compose -f $COMPOSE_BASE_FILE $COMPOSE_FILES down
         ;;
     "logs")
-        env \$(cat .env | grep -v '^#' | xargs) $GPU_ASSIGNMENTS docker compose -f docker-compose.yml $COMPOSE_FILES logs -f
+        env \$(cat .env | grep -v '^#' | xargs) $GPU_ASSIGNMENTS docker compose -f $COMPOSE_BASE_FILE $COMPOSE_FILES logs -f
         ;;
     *)
         echo "Usage: ./docker-ctl.sh [down|logs]"
@@ -2088,18 +2101,20 @@ case "\$1" in
         ;;
 esac
 EOF
-        chmod +x docker-ctl.sh
-        rm -f gpu_assignments.txt
     else
-        docker compose -f docker-compose.yml $COMPOSE_FILES up -d
+        COMPOSE_CMD="docker compose -f $COMPOSE_BASE_FILE $COMPOSE_FILES"
+        # Start the containers
+        $COMPOSE_CMD up -d
+        
+        # Create docker-ctl.sh script for Ollama mode
         cat > docker-ctl.sh << EOF
 #!/bin/bash
 case "\$1" in
     "down")
-        docker compose -f docker-compose.yml $COMPOSE_FILES down
+        docker compose -f $COMPOSE_BASE_FILE $COMPOSE_FILES down
         ;;
     "logs")
-        docker compose -f docker-compose.yml $COMPOSE_FILES logs -f
+        docker compose -f $COMPOSE_BASE_FILE $COMPOSE_FILES logs -f
         ;;
     *)
         echo "Usage: ./docker-ctl.sh [down|logs]"
@@ -2107,7 +2122,13 @@ case "\$1" in
         ;;
 esac
 EOF
-        chmod +x docker-ctl.sh
+    fi
+    
+    chmod +x docker-ctl.sh
+    
+    # Clean up temp files
+    if [[ -f "gpu_assignments.txt" ]]; then
+        rm -f gpu_assignments.txt
     fi
 }
 
