@@ -37,66 +37,66 @@ if MODULES_SOURCE_DIR not in sys.path:
     sys.path.append(MODULES_SOURCE_DIR)
 
 @app.task(bind=True, acks_late=True)
-def run_agent(self, agent_run, user_env_data = {}):
+def run_agent(self, agent_run, user_env_data = {}, secrets = []):
     try:
         agent_run = AgentRun(**agent_run)
         loop = asyncio.get_event_loop()
-        return loop.run_until_complete(_run_module_async(agent_run, user_env_data))
+        return loop.run_until_complete(_run_module_async(agent_run, user_env_data, secrets))
     finally:
         # Force cleanup of channels
         app.backend.cleanup()
 
 @app.task(bind=True, acks_late=True)
-def run_memory(self, memory_run, user_env_data = {}):
+def run_memory(self, memory_run, user_env_data = {}, secrets = []):
     try:
         memory_run = MemoryRun(**memory_run)
         loop = asyncio.get_event_loop()
-        return loop.run_until_complete(_run_module_async(memory_run, user_env_data))
+        return loop.run_until_complete(_run_module_async(memory_run, user_env_data, secrets))
     finally:
         # Force cleanup of channels
         app.backend.cleanup()
 
 @app.task(bind=True, acks_late=True)
-def run_tool(self, tool_run, user_env_data = {}):
+def run_tool(self, tool_run, user_env_data = {}, secrets = []):
     try:
         tool_run = ToolRun(**tool_run)
         loop = asyncio.get_event_loop()
-        return loop.run_until_complete(_run_module_async(tool_run, user_env_data))
+        return loop.run_until_complete(_run_module_async(tool_run, user_env_data, secrets))
     finally:
         # Force cleanup of channels
         app.backend.cleanup()
 
 @app.task(bind=True, acks_late=True)
-def run_orchestrator(self, orchestrator_run, user_env_data = {}):
+def run_orchestrator(self, orchestrator_run, user_env_data = {}, secrets = []):
     try:
         orchestrator_run = OrchestratorRun(**orchestrator_run)
         loop = asyncio.get_event_loop()
-        return loop.run_until_complete(_run_module_async(orchestrator_run, user_env_data))
+        return loop.run_until_complete(_run_module_async(orchestrator_run, user_env_data, secrets))
     finally:
         # Force cleanup of channels
         app.backend.cleanup()
 
 @app.task(bind=True, acks_late=True)
-def run_environment(self, environment_run, user_env_data = {}):
+def run_environment(self, environment_run, user_env_data = {}, secrets = []):
     try:
         environment_run = EnvironmentRun(**environment_run)
         loop = asyncio.get_event_loop()
-        return loop.run_until_complete(_run_module_async(environment_run, user_env_data))
+        return loop.run_until_complete(_run_module_async(environment_run, user_env_data, secrets))
     finally:
         # Force cleanup of channels
         app.backend.cleanup()
 
 @app.task(bind=True, acks_late=True)
-def run_kb(self, kb_run, user_env_data = {}):
+def run_kb(self, kb_run, user_env_data = {}, secrets = []):
     try:
         kb_run = KBRun(**kb_run)
         loop = asyncio.get_event_loop()
-        return loop.run_until_complete(_run_module_async(kb_run, user_env_data))
+        return loop.run_until_complete(_run_module_async(kb_run, user_env_data, secrets))
     finally:
         # Force cleanup of channels
         app.backend.cleanup()
 
-async def _run_module_async(module_run: Union[AgentRun, MemoryRun, ToolRun, OrchestratorRun, EnvironmentRun, KBRun], user_env_data = {}) -> None:
+async def _run_module_async(module_run: Union[AgentRun, MemoryRun, ToolRun, OrchestratorRun, EnvironmentRun, KBRun], user_env_data = {}, secrets = []) -> None:
     """Handles execution of agent, memory, orchestrator, and environment runs.
     
     Args:
@@ -123,7 +123,7 @@ async def _run_module_async(module_run: Union[AgentRun, MemoryRun, ToolRun, Orch
             return
 
         await module_run_engine.init_run()
-        await module_run_engine.start_run(user_env_data)
+        await module_run_engine.start_run(user_env_data, secrets)
 
         if module_run_engine.module_run.status == "completed":
             await module_run_engine.complete()
@@ -238,7 +238,7 @@ class ModuleLoader:
             os.environ.clear()
             os.environ.update(old_env)
 
-    async def load_and_run(self, module_path: Path, entrypoint: str, module_run, user_env_data = {}):
+    async def load_and_run(self, module_path: Path, entrypoint: str, module_run, user_env_data = {}, secrets = []):
         with self.package_context(user_env_data):
             try:
                 # Remove any existing module references
@@ -268,9 +268,9 @@ class ModuleLoader:
                     module_run_dict = module_run
                 
                 if inspect.iscoroutinefunction(run_func):
-                    result = await run_func(module_run=module_run_dict)
+                    result = await run_func(module_run=module_run_dict, secrets=secrets)
                 else:
-                    result = await maybe_async_call(run_func, module_run=module_run_dict)
+                    result = await maybe_async_call(run_func, module_run=module_run_dict, secrets=secrets)
                 
                 return result
 
@@ -313,7 +313,7 @@ class ModuleRunEngine:
         # Load the module
         self.module_run = await load_and_validate_input_schema(self.module_run)
 
-    async def start_run(self, env_data = {}):
+    async def start_run(self, env_data = {}, secrets = []):
         """Executes the module run"""
         logger.info(f"Starting {self.module_type} run")
         self.module_run.status = "running"
@@ -343,7 +343,8 @@ class ModuleRunEngine:
                 module_path=module_path,
                 entrypoint=entrypoint,
                 module_run=self.module_run,
-                user_env_data=env_data
+                user_env_data=env_data,
+                secrets=secrets
             )
             
             # Handle response
