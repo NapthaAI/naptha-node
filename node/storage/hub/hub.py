@@ -8,7 +8,6 @@ from surrealdb import Surreal
 import traceback
 from typing import Dict, List, Optional, Tuple
 from node.schemas import SecretInput
-from contextlib import asynccontextmanager
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -51,29 +50,6 @@ class HubDBSurreal(AsyncMixin):
         except jwt.PyJWTError as e:
             logger.error(f"Token decoding failed: {e}")
             return None
-        
-    @asynccontextmanager
-    async def root_user_context(self):
-        try:
-            # Sign in as regular user if local hub is false
-            if os.getenv("LOCAL_HUB").lower() == "false":
-                await self.surrealdb.signin(
-                    {
-                        "username": os.getenv("HUB_USERNAME"), 
-                        "password": os.getenv("HUB_PASSWORD"),
-                        "NS": self.ns,
-                        "DB": self.db,
-                        "AC": "user"
-                    }
-                )
-            else:
-                # Sign in as root user if local hub is true
-                await self.surrealdb.signin({"user": os.getenv("HUB_DB_SURREAL_ROOT_USER"), "pass": os.getenv("HUB_DB_SURREAL_ROOT_PASS")})
-            yield
-        finally:
-            if os.getenv("LOCAL_HUB").lower() == "true":
-                logger.info("Signing out from root user")
-            await self.close()
 
     async def signin(
         self, username: str, password: str
