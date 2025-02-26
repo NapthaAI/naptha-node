@@ -111,16 +111,16 @@ async def _run_module_async(module_run: Union[AgentRun, MemoryRun, ToolRun, Orch
 
         logger.info(f"Received {module_run_engine.module_type} run: {module_run} - Checking if {module_run_engine.module_type} {module_name} version {module_version} is installed")
 
-        try:
-            await install_module_with_lock(module)
-        except Exception as e:
-            error_msg = (f"Failed to install or verify {module_run_engine.module_type} {module_name}: {str(e)}")
-            logger.error(error_msg)
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            if "Dependency conflict detected" in str(e):
-                logger.error("This error is likely due to a mismatch in naptha-sdk versions. Please check and align the versions in both the agent and the main project.")
-            await handle_failure(error_msg=error_msg, module_run=module_run)
-            return
+        # try:
+        #     await install_module_with_lock(module)
+        # except Exception as e:
+        #     error_msg = (f"Failed to install or verify {module_run_engine.module_type} {module_name}: {str(e)}")
+        #     logger.error(error_msg)
+        #     logger.error(f"Traceback: {traceback.format_exc()}")
+        #     if "Dependency conflict detected" in str(e):
+        #         logger.error("This error is likely due to a mismatch in naptha-sdk versions. Please check and align the versions in both the agent and the main project.")
+        #     await handle_failure(error_msg=error_msg, module_run=module_run)
+        #     return
 
         await module_run_engine.init_run()
         await module_run_engine.start_run(user_env_data)
