@@ -41,5 +41,5 @@ CMD (poetry run python -m node.storage.db.init_db | tee /dev/stdout) && \
     (poetry run python -m node.storage.hub.init_hub --user | tee /dev/stdout) && \
     ((poetry run celery -A node.worker.main:app worker --loglevel=info | tee /dev/stdout) & ) && \
     (poetry run python -m node.server.server --communication-protocol http --port 7001 | tee /dev/stdout) & \
-    poetry run python -m node.server.server --communication-protocol ws --port 7002 | tee /dev/stdout
+    poetry run python -m node.server.server --communication-protocol grpc --port 7002 | tee /dev/stdout
 
