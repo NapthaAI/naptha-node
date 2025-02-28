@@ -266,12 +266,21 @@ class ModuleLoader:
                     module_run_dict = module_run.model_dump()
                 else:
                     module_run_dict = module_run
+
+                # Check if run_func accepts variable keyword arguments
+                sig = inspect.signature(run_func)
+                has_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
                 
                 if inspect.iscoroutinefunction(run_func):
-                    result = await run_func(module_run=module_run_dict, secrets=secrets)
+                    if has_kwargs:
+                        result = await run_func(module_run=module_run_dict, secrets=secrets)
+                    else:
+                        result = await run_func(module_run=module_run_dict)
                 else:
-                    result = await maybe_async_call(run_func, module_run=module_run_dict, secrets=secrets)
-                
+                    if has_kwargs:
+                        result = await maybe_async_call(run_func, module_run=module_run_dict, secrets=secrets)
+                    else:
+                        result = await maybe_async_call(run_func, module_run=module_run_dict)
                 return result
 
             except Exception as e:
