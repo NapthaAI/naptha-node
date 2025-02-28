@@ -34,9 +34,12 @@ from node.schemas import (
     ToolRunInput,
     EnvironmentRunInput,
     KBRunInput,
-    ModuleExecutionType
+    ModuleExecutionType,
+    SecretInput
 )
+from node.secret import Secret
 from node.module_manager import setup_module_deployment
+from node.utils import get_logger
 
 load_dotenv()
 
@@ -44,7 +47,7 @@ file_path = Path(__file__).resolve()
 root_dir = file_path.parent.parent.parent
 MODULES_SOURCE_DIR = root_dir / os.getenv("MODULES_SOURCE_DIR")
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class GrpcServerServicer(grpc_server_pb2_grpc.GrpcServerServicer):
     async def CheckUser(self, request, context):
@@ -112,6 +115,17 @@ class GrpcServerServicer(grpc_server_pb2_grpc.GrpcServerServicer):
     async def RunModule(self, request, context):
         try:
             module_type = request.module_type
+            if len(request.secrets) > 0:
+                secrets = [SecretInput(
+                    user_id=secret.user_id,
+                    secret_value=secret.secret_value,
+                    key_name=secret.key_name
+                ) for secret in request.secrets]
+            else:
+                secrets = []
+            
+            request_dict = MessageToDict(request, preserving_proto_field_name=True)
+
             module_configs = {
                 "agent": {
                     "input_class": AgentRunInput,
@@ -196,8 +210,19 @@ class GrpcServerServicer(grpc_server_pb2_grpc.GrpcServerServicer):
             else:
                 execution_type = run_input.deployment.module.execution_type
 
+            # Process secrets for environment variables
+            user_env_data = {}
+            secret_obj = Secret()
+            if secrets:
+                for secret in secrets:
+                    user_env_data[secret.key_name] = secret_obj.decrypt_rsa(secret.secret_value)
+
             if execution_type == ModuleExecutionType.package or execution_type == "package":
-                task = config["worker"].delay(module_run_data)
+                task = config["worker"].delay(
+                    module_run_data,
+                    user_env_data,
+                    [secret.model_dump() for secret in secrets] if secrets else []
+                )
             elif execution_type == ModuleExecutionType.docker or execution_type == "docker":
                 if config["docker_support"]:
                     task = execute_docker_agent.delay(module_run_data)
