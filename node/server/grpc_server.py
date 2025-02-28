@@ -10,6 +10,7 @@ from google.protobuf.empty_pb2 import Empty
 from google.protobuf.json_format import MessageToDict
 from grpc import ServicerContext
 import os
+import concurrent.futures   
 from typing import Dict, Any, Union
 from google.protobuf import struct_pb2
 from node.storage.db.db import LocalDBPostgres
@@ -370,29 +371,40 @@ class GrpcServerServicer(grpc_server_pb2_grpc.GrpcServerServicer):
         return grpc_server_pb2.GeneralResponse(ok=True)
 
 class GrpcServer:
-    def __init__(
-        self,
-        host: str,
-        port: int,
-        node_id: str,
-    ):
+    def __init__(self, host: str, port: int, node_id: str):
         self.host = host
         self.port = port
         self.node_id = node_id
         self.shutdown_event = asyncio.Event()
 
+        # Remove thread_pool as it's not supported in grpc.aio
         options = [
-            ("grpc.max_send_message_length", 100 * 1024 * 1024),
-            ("grpc.max_receive_message_length", 100 * 1024 * 1024),
-            ("grpc.keepalive_time_ms", 30 * 60 * 1000),       # 30 minutes
-            ("grpc.keepalive_timeout_ms", 30 * 60 * 1000),     # 30 minutes
-            ("grpc.http2.max_pings_without_data", 0),
-            ("grpc.http2.min_time_between_pings_ms", 30 * 60 * 1000),  # 30 minutes
-            ("grpc.max_connection_idle_ms", 60 * 60 * 1000),   # 1 hour
-            ("grpc.max_connection_age_ms", 2 * 60 * 60 * 1000),  # 2 hours
+            # Message size settings
+            ("grpc.max_send_message_length", 10 * 1024 * 1024),
+            ("grpc.max_receive_message_length", 10 * 1024 * 1024),
+            
+            # Critical for high concurrency
+            ("grpc.max_concurrent_streams", 10000),  # Allow many streams per connection
+            
+            # Keepalive settings
+            ("grpc.keepalive_time_ms", 30000),       # 30 seconds
+            ("grpc.keepalive_timeout_ms", 10000),    # 10 seconds
+            ("grpc.keepalive_permit_without_calls", 1),
+            
+            # Connection management
+            ("grpc.http2.max_pings_without_data", 5),
+            ("grpc.http2.min_time_between_pings_ms", 10000),  # 10 seconds
+            ("grpc.max_connection_idle_ms", 300000),  # 5 minutes
+            ("grpc.max_connection_age_ms", 600000),   # 10 minutes
+            ("grpc.max_connection_age_grace_ms", 5000),
+            
+            # Other optimizations
+            ("grpc.server.enable_http2_port_sharing", 1),
         ]
-
+        
+        # Remove thread_pool and maximum_concurrent_rpcs parameters
         self.server = grpc.aio.server(options=options)
+        
         grpc_server_pb2_grpc.add_GrpcServerServicer_to_server(
             GrpcServerServicer(), self.server
         )
