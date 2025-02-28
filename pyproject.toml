@@ -46,6 +46,10 @@ aiohttp = "^3.11.9"
 psycopg2 = "^2.9.10"
 cryptography = "^44.0.0"
 
+[tool.poetry.dependencies.eth-hash]
+extras = [ "pycryptodome",]
+version = "^0.7.0"
+
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.1.11"
 ipykernel = "^6.29.2"

@@ -6,6 +6,7 @@ from pathlib import Path
 
 file_path = Path(__file__).resolve()
 root_path = file_path.parent.parent
+from eth_hash.auto import keccak
 
 logger = logging.getLogger(__name__)
 
@@ -95,3 +96,12 @@ def verify_signature(consumer_id, signature_hex, public_key_hex):
             return True
     except:
         return False
+    
+def generate_address(public_key: bytes) -> str:
+    if len(public_key) not in [64, 33]:
+        print(public_key)
+        raise ValueError("Public key must be either 33 or 64 bytes long.")
+        
+    hash = keccak(public_key)
+    address = hash[-20:]
+    return "0x" + address.hex()

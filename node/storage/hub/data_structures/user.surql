@@ -9,6 +9,7 @@ DEFINE FIELD password ON user TYPE string PERMISSIONS FOR select NONE
     PERMISSIONS
         FOR select, update, delete WHERE id = $auth.id;
 DEFINE FIELD public_key ON user TYPE string;
+DEFINE FIELD address ON user TYPE string;
 
 DEFINE FIELD created ON user 
     VALUE $before OR time::now()
@@ -23,6 +24,7 @@ DEFINE FIELD updated ON user
 
 DEFINE INDEX unique_username ON user FIELDS username UNIQUE;
 DEFINE INDEX unique_public_key ON user FIELDS public_key UNIQUE;
+DEFINE INDEX unique_address ON user FIELDS address UNIQUE;
 
 DEFINE EVENT removal ON user WHEN $event = "DELETE" THEN {
     DELETE job WHERE consumer_id = $before.id;
