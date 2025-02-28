@@ -5,6 +5,12 @@ services:
   rabbitmq:
     image: rabbitmq:4-alpine
     container_name: node-rabbitmq
+    ulimits:
+      nofile:
+        soft: 500000
+        hard: 500000
+    sysctls:
+      net.core.somaxconn: 32768
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     environment:
@@ -49,8 +55,18 @@ services:
     # can replace this with naptha image once it's published to hub, then we just
     # need to use the .env file UNLESS config.py is modified
     container_name: node-app
-    image: napthaai/node:latest
-
+    build:
+      context: .
+      dockerfile: Dockerfile-node-dev
+    ulimits:
+      nofile:
+        soft: 1000000
+        hard: 1000000
+    sysctls:
+      net.core.somaxconn: 65535
+      net.ipv4.tcp_max_syn_backlog: 65535
+      net.ipv4.tcp_fin_timeout: 30
+      net.ipv4.tcp_tw_reuse: 1
     env_file:
       - ./.env
     volumes:
