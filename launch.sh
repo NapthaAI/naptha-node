@@ -909,6 +909,7 @@ SendSIGKILL=yes
 # Environment variables for shutdown behavior
 Environment=UVICORN_TIMEOUT=30
 Environment=UVICORN_GRACEFUL_SHUTDOWN=30
+Environment=PATH=$HOME/.local/bin:$HOME/.cargo/bin:${PATH}
 
 [Install]
 WantedBy=multi-user.target
@@ -951,6 +952,7 @@ TimeoutStopSec=3
 KillMode=mixed
 KillSignal=SIGTERM
 SendSIGKILL=yes
+Environment=PATH=$HOME/.local/bin:$HOME/.cargo/bin:${PATH}
 
 [Install]
 WantedBy=multi-user.target
@@ -1022,7 +1024,7 @@ darwin_start_servers() {
         <key>ENVIRONMENT_FILE_PATH</key>
         <string>$ENVIRONMENT_FILE_PATH</string>
         <key>PATH</key>
-        <string>$CURRENT_DIR/.venv/bin:$SURRREALDB_PATH:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <string>$HOME/.local/bin:$HOME/.cargo/bin:$CURRENT_DIR/.venv/bin:$SURRREALDB_PATH:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
@@ -1091,7 +1093,7 @@ EOF
         <key>ENVIRONMENT_FILE_PATH</key>
         <string>$ENVIRONMENT_FILE_PATH</string>
         <key>PATH</key>
-        <string>$CURRENT_DIR/.venv/bin:$SURRREALDB_PATH:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <string>$HOME/.local/bin:$HOME/.cargo/bin:$CURRENT_DIR/.venv/bin:$SURRREALDB_PATH:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
@@ -1158,7 +1160,7 @@ EnvironmentFile=$ENVIRONMENT_FILE_PATH
 ExecStart=$CURRENT_DIR/celery_worker_start.sh
 Restart=always
 Environment="PYTHONPATH=$CURRENT_DIR"
-Environment="PATH=$CURRENT_DIR/.venv/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+Environment=PATH=$HOME/.local/bin:$HOME/.cargo/bin:${PATH}
 
 [Install]
 WantedBy=multi-user.target
@@ -1261,7 +1263,7 @@ EOF
         <key>ENVIRONMENT_FILE_PATH</key>
         <string>$ENVIRONMENT_FILE_PATH</string>
         <key>PATH</key>
-        <string>$CURRENT_DIR/.venv/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <string>$HOME/.local/bin:$HOME/.cargo/bin:$CURRENT_DIR/.venv/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
     <key>SoftResourceLimits</key>
     <dict>
