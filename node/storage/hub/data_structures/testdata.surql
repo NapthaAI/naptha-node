@@ -92,7 +92,7 @@ RELATE user:seller1->is_associated_with->organization:naptha;
 
 
 -- AGENTS
-CREATE agent:hello_world_agent SET name="hello_world_agent", description="A simple hello world agent", parameters="{firstname: str, surname: str}", author=user:naptha, module_url="https://github.com/NapthaAI/hello_world_agent", module_type="agent", execution_type="package", module_version="v0.16", module_entrypoint="run.py";
+CREATE agent:hello_world_agent SET name="hello_world_agent", description="A simple hello world agent", parameters="{firstname: str, surname: str}", author=user:naptha, module_url="https://github.com/moarshy/hello_world_agent", module_type="agent", execution_type="package", module_version="v0.1", module_entrypoint="run.py";
 CREATE agent:simple_chat_agent SET name="simple_chat_agent", description="A simple chat agent", parameters="{tool_name: str, tool_input_data: str}", author=user:naptha, module_url="https://github.com/NapthaAI/simple_chat_agent", module_type="agent", execution_type="package", module_version="v0.16", module_entrypoint="run.py";
 CREATE agent:babyagi_task_initiator SET name="babyagi_task_initiator", description="A simple agent for initiating tasks in BabyAGI", parameters="{objective: str}", author=user:naptha, module_url="https://github.com/NapthaAI/babyagi_task_initiator", module_type="agent", execution_type="package", module_version="v0.2", module_entrypoint="run.py";
 CREATE agent:babyagi_task_executor SET name="babyagi_task_executor", description="A simple agent for executing tasks in BabyAGI", parameters="{tool_name: str, tool_input_data: str}", author=user:naptha, module_url="https://github.com/NapthaAI/babyagi_task_executor", module_type="agent", execution_type="package", module_version="v0.2", module_entrypoint="run.py";
