@@ -100,7 +100,7 @@ def is_module_installed(module_name: str, required_version: str) -> bool:
             logger.warning(f"No virtual environment found for {module_name}")
             return False
 
-        try:
+        try:    
             repo = Repo(modules_source_dir)
             if repo.head.is_detached:
                 current_tag = next((tag.name for tag in repo.tags if tag.commit == repo.head.commit), None)
@@ -141,9 +141,15 @@ async def install_module_with_lock(module: Union[Dict, Module]):
     if module_name in INSTALLED_MODULES:
         installed_version = INSTALLED_MODULES[module_name]
         if installed_version == run_version:
-            logger.info("Running poetry update")
-            update_output = run_poetry_command(["update", f"{module_name}"])
-            logger.debug(f"Update output: {update_output}")
+            logger.info("Running uv update")
+            modules_source_dir = Path(MODULES_SOURCE_DIR) / module_name
+            venv_dir = modules_source_dir / ".venv"
+            pip_path = venv_dir / "bin" / "pip"
+            
+            # Use pip from the virtual environment to update the package
+            update_cmd = [str(pip_path), "install", "--upgrade", "-e", "."]
+            proc = subprocess.run(update_cmd, capture_output=True, text=True, cwd=modules_source_dir)
+            logger.debug(f"Update output: {proc.stdout}")
             logger.debug(f"Module {module_name} version {run_version} is already installed")
             return True
 
@@ -330,12 +336,12 @@ def install_module_from_git(module_name: str, module_version: str, module_source
             error_msg += "\nThis is likely due to a mismatch in naptha-sdk versions between the module and the main project."
         raise RuntimeError(error_msg) from e
     
-def run_poetry_command(command, module_name=None):
+def run_uv_command(command, module_name=None):
     try:
         if module_name:
             modules_source_dir = Path(MODULES_SOURCE_DIR) / module_name
             result = subprocess.run(
-                ["poetry"] + command,
+                ["uv"] + command,
                 check=True,
                 capture_output=True,
                 text=True,
@@ -343,7 +349,7 @@ def run_poetry_command(command, module_name=None):
             )
         else:
             result = subprocess.run(
-                ["poetry"] + command,
+                ["uv"] + command,
                 check=True,
                 capture_output=True,
                 text=True
@@ -351,7 +357,7 @@ def run_poetry_command(command, module_name=None):
         return result.stdout
     except subprocess.CalledProcessError as e:
         error_msg = (
-            f"Poetry command failed: {e.cmd}\n"
+            f"UV command failed: {e.cmd}\n"
             f"Stdout: {e.stdout}\n"
             f"Stderr: {e.stderr}"
         )
@@ -369,15 +375,27 @@ def install_module(module_name: str, module_version: str, module_source_url: str
         else:
             install_module_from_git(module_name, module_version, module_source_url)
 
-        # Create venv
+        # Create virtual environment using UV directly in the module folder
+        subprocess.run(["uv", "venv", ".venv"], check=True, cwd=modules_source_dir)
+        
+        # Install pip in the virtual environment
         venv_dir = modules_source_dir / ".venv"
-        subprocess.run([sys.executable, "-m", "venv", str(venv_dir)], check=True)
+        python_path = venv_dir / "bin" / "python"
+        
+        # Install pip in the virtual environment
+        venv_dir = modules_source_dir / ".venv"
+        python_path = venv_dir / "bin" / "python"
+        subprocess.run([
+            str(python_path), "-c",
+            "import sys; from urllib.request import urlopen; exec(urlopen('https://bootstrap.pypa.io/get-pip.py').read())"
+        ], check=True)
 
+        # Install the module in development mode
         pip_path = venv_dir / "bin" / "pip"
-        install_cmd = [str(pip_path), "install", "-e", str(modules_source_dir)]
+        install_cmd = [str(pip_path), "install", "."]
 
         # Capture stdout/stderr
-        proc = subprocess.run(install_cmd, capture_output=True, text=True)
+        proc = subprocess.run(install_cmd, capture_output=True, text=True, cwd=modules_source_dir)
         logger.debug(f"Pip install stdout: {proc.stdout}")
         logger.debug(f"Pip install stderr: {proc.stderr}")
 

@@ -199,6 +199,7 @@ class ModuleLoader:
             os.chdir(str(self.module_dir))
             
             # Add both site-packages and module root directory to path
+            # UV uses a slightly different structure for virtual environments
             venv_site_packages = os.path.join(
                 self.venv_path, 
                 'lib', 
