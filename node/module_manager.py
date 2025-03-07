@@ -144,10 +144,9 @@ async def install_module_with_lock(module: Union[Dict, Module]):
             logger.info("Running uv update")
             modules_source_dir = Path(MODULES_SOURCE_DIR) / module_name
             venv_dir = modules_source_dir / ".venv"
-            pip_path = venv_dir / "bin" / "pip"
             
             # Use pip from the virtual environment to update the package
-            update_cmd = [str(pip_path), "install", "--upgrade", "-e", "."]
+            update_cmd = ["uv", "pip", "install", "--upgrade", "-e", "."]
             proc = subprocess.run(update_cmd, capture_output=True, text=True, cwd=modules_source_dir)
             logger.debug(f"Update output: {proc.stdout}")
             logger.debug(f"Module {module_name} version {run_version} is already installed")
@@ -391,8 +390,7 @@ def install_module(module_name: str, module_version: str, module_source_url: str
         ], check=True)
 
         # Install the module in development mode
-        pip_path = venv_dir / "bin" / "pip"
-        install_cmd = [str(pip_path), "install", "."]
+        install_cmd = ["uv", "pip", "install", "."]
 
         # Capture stdout/stderr
         proc = subprocess.run(install_cmd, capture_output=True, text=True, cwd=modules_source_dir)
