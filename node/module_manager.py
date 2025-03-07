@@ -143,9 +143,6 @@ async def install_module_with_lock(module: Union[Dict, Module]):
         if installed_version == run_version:
             logger.info("Running uv update")
             modules_source_dir = Path(MODULES_SOURCE_DIR) / module_name
-            venv_dir = modules_source_dir / ".venv"
-            
-            # Use pip from the virtual environment to update the package
             update_cmd = ["uv", "pip", "install", "--upgrade", "-e", "."]
             proc = subprocess.run(update_cmd, capture_output=True, text=True, cwd=modules_source_dir)
             logger.debug(f"Update output: {proc.stdout}")
@@ -389,16 +386,13 @@ def install_module(module_name: str, module_version: str, module_source_url: str
             "import sys; from urllib.request import urlopen; exec(urlopen('https://bootstrap.pypa.io/get-pip.py').read())"
         ], check=True)
 
-        # Install the module in development mode
-        install_cmd = ["uv", "pip", "install", "."]
-
-        # Capture stdout/stderr
+        logger.info(f"Which uv: {shutil.which('uv')}")
+        logger.info(f"Whichpython: {shutil.which('python')}")
+        
+        install_cmd = ["uv", "pip", "install", "-e", "."]
         proc = subprocess.run(install_cmd, capture_output=True, text=True, cwd=modules_source_dir)
         logger.debug(f"Pip install stdout: {proc.stdout}")
         logger.debug(f"Pip install stderr: {proc.stderr}")
-
-        if proc.returncode != 0:
-            raise RuntimeError(f"Pip install failed: {proc.stderr}")
 
         if not verify_module_installation(module_name):
             raise RuntimeError(f"Module {module_name} failed verification after installation")
