@@ -14,6 +14,7 @@ import yaml
 import zipfile
 import requests
 from node.storage.utils import get_api_url
+from node.storage.utils import to_multiaddr
 
 load_dotenv()
 logger = logging.getLogger(__name__)
@@ -26,7 +27,7 @@ RETRY_DELAY = 1
 
 def download_from_ipfs(ipfs_hash: str, temp_dir: str) -> str:
     """Download content from IPFS to a given temporary directory."""
-    client = ipfshttpclient.connect(IPFS_GATEWAY_URL)
+    client = ipfshttpclient.connect(to_multiaddr(IPFS_GATEWAY_URL), timeout=60*5)
     client.get(ipfs_hash, target=temp_dir)
     return os.path.join(temp_dir, ipfs_hash)
 
@@ -62,7 +63,7 @@ def handle_ipfs_input(ipfs_hash: str) -> str:
 def upload_to_ipfs(input_dir: str) -> str:
     """Upload a file or directory to IPFS. And pin it."""
     logger.info(f"Uploading to IPFS: {input_dir}")
-    client = ipfshttpclient.connect(IPFS_GATEWAY_URL)
+    client = ipfshttpclient.connect(to_multiaddr(IPFS_GATEWAY_URL), timeout=60*5)
     res = client.add(input_dir, recursive=True)
     logger.debug(f"IPFS add response: {res}")
     ipfs_hash = res[-1]["Hash"]
@@ -73,7 +74,7 @@ def upload_to_ipfs(input_dir: str) -> str:
 def upload_json_string_to_ipfs(json_string: str) -> str:
     """Upload a json string to IPFS. And pin it."""
     logger.info("Uploading json string to IPFS")
-    client = ipfshttpclient.connect(IPFS_GATEWAY_URL)
+    client = ipfshttpclient.connect(to_multiaddr(IPFS_GATEWAY_URL), timeout=60*5)
     res = client.add_str(json_string)
     logger.debug(f"IPFS add response: {res}")
     client.pin.add(res)
