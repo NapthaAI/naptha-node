@@ -386,10 +386,8 @@ def install_module(module_name: str, module_version: str, module_source_url: str
             "import sys; from urllib.request import urlopen; exec(urlopen('https://bootstrap.pypa.io/get-pip.py').read())"
         ], check=True)
 
-        logger.info(f"Which uv: {shutil.which('uv')}")
-        logger.info(f"Whichpython: {shutil.which('python')}")
-        
-        install_cmd = ["uv", "pip", "install", "-e", "."]
+        python_path = str(venv_dir / "bin" / "python")
+        install_cmd = ["uv", "pip", "install", "--python", python_path, "-e", "."]
         proc = subprocess.run(install_cmd, capture_output=True, text=True, cwd=modules_source_dir)
         logger.debug(f"Pip install stdout: {proc.stdout}")
         logger.debug(f"Pip install stderr: {proc.stderr}")
