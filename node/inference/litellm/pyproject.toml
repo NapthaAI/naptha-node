@@ -1,14 +1,16 @@
-[build-system]
-requires = [ "poetry-core",]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry]
+[project]
 name = "litellm-node"
 version = "0.1.0"
 description = ""
-authors = [ "moarshy <marshath@gmail.com>",]
+authors = [
+    {name = "moarshy", email = "marshath@gmail.com"},
+]
 readme = "README.md"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "litellm[proxy]==1.54.0",
+]
 
-[tool.poetry.dependencies]
-python = ">=3.11,<3.13"
-litellm = {extras = ["proxy"], version = "1.54.0"}
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

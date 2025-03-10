@@ -195,3 +195,5 @@ docker_compose_command.sh
 .DS_Store
 user_private.pem
 *.pem
+node/inference/ollama/.gitkeep
+node/inference/litellm/start_litellm.sh

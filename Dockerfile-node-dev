@@ -7,7 +7,6 @@ COPY . .
 # use bash instead of sh
 SHELL ["/bin/bash", "-c"]
 
-
 # install deps
 RUN apt-get update
 RUN apt-get install gcc curl git libpq-dev -y
@@ -18,17 +17,26 @@ RUN conda create -y -n node python=3.12
 RUN echo "source activate node" > /root/.bashrc
 ENV PATH="/opt/conda/envs/node/bin:$PATH"
 
-# install postgres (required for poetry to build psycopg2 from source)
+# install postgres (required for building psycopg2 from source)
 RUN conda install -y conda-forge::postgresql=17.2
 ENV LDFLAGS="-L/opt/conda/lib"
 ENV CPPFLAGS="-I/opt/conda/include"
 
-# set up poetry
-ENV PATH="/root/.local/share/pypoetry/venv/bin/:${PATH}"
-RUN pip install poetry
-RUN poetry config virtualenvs.in-project true
-RUN poetry lock
-RUN poetry install --only main
+# Install uv properly and add to PATH
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.cargo/bin:/root/.local/bin:${PATH}"
+
+# Create virtual environment with uv
+RUN uv venv .venv
+
+# Install pip explicitly in the virtual environment
+RUN curl -sSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+    .venv/bin/python get-pip.py && \
+    rm get-pip.py
+
+# Install dependencies with uv
+RUN . .venv/bin/activate && \
+    uv pip install -e .
 
 # install surrealDB so that we have the command line tool
 RUN curl -sSf https://install.surrealdb.com | sh
@@ -36,10 +44,9 @@ RUN curl -sSf https://install.surrealdb.com | sh
 EXPOSE 7001 7002
 
 # run db migrations / config & server
-CMD (poetry run python -m node.storage.db.init_db | tee /dev/stdout) && \
-    (poetry run python -m node.storage.hub.init_hub | tee /dev/stdout) && \
-    (poetry run python -m node.storage.hub.init_hub --user | tee /dev/stdout) && \
-    ((poetry run celery -A node.worker.main:app worker --loglevel=info | tee /dev/stdout) & ) && \
-    (poetry run python -m node.server.server --communication-protocol http --port 7001 | tee /dev/stdout) & \
-    poetry run python -m node.server.server --communication-protocol ws --port 7002 | tee /dev/stdout
-
+CMD (uv run -m node.storage.db.init_db | tee /dev/stdout) && \
+    (uv run -m node.storage.hub.init_hub | tee /dev/stdout) && \
+    (uv run -m node.storage.hub.init_hub --user | tee /dev/stdout) && \
+    ((uv run -m celery -A node.worker.main:app worker --loglevel=info | tee /dev/stdout) & ) && \
+    (uv run -m node.server.server --communication-protocol http --port 7001 | tee /dev/stdout) & \
+    uv run -m node.server.server --communication-protocol ws --port 7002 | tee /dev/stdout

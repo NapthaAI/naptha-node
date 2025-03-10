@@ -648,57 +648,68 @@ darwin_start_rabbitmq() {
     echo "RabbitMQ started with management console on default port." | log_with_service_name "RabbitMQ" $PINK
 }
 
-# Function to set up poetry within Miniforge environment
-setup_poetry() {
-    echo "Setting up Poetry..." | log_with_service_name "Poetry" "$BLUE"
+setup_uv() {
+    echo "Setting up uv..." | log_with_service_name "uv" "$BLUE"
     
     # Ensure the script is running within a Conda environment
     if [ -z "$CONDA_DEFAULT_ENV" ]; then
-        echo "Not inside a Conda environment. Activating Miniforge..." | log_with_service_name "Poetry" "$BLUE"
+        echo "Not inside a Conda environment. Activating Miniforge..." | log_with_service_name "uv" "$BLUE"
         source "$HOME/miniforge3/bin/activate"
         conda activate
     fi
 
-    # Install Poetry if it's not already installed
-    if ! command -v poetry >/dev/null 2>&1; then
-        echo "Installing Poetry..." | log_with_service_name "Poetry" "$BLUE"
-        curl -sSL https://install.python-poetry.org | python -
+    # Install uv if it's not already installed
+    if ! command -v uv >/dev/null 2>&1; then
+        echo "Installing uv..." | log_with_service_name "uv" "$BLUE"
+        curl -LsSf https://astral.sh/uv/install.sh | sh
     else
-        echo "Poetry is already installed." | log_with_service_name "Poetry" "$BLUE"
+        echo "uv is already installed." | log_with_service_name "uv" "$BLUE"
     fi
 
     os="$(uname)"
     if [ "$os" = "Darwin" ]; then
-        export PATH="/Users/$(whoami)/.local/bin:$PATH"
+        export PATH="$HOME/.cargo/bin:$PATH"
     else
-        export PATH="/home/$(whoami)/.local/bin:$PATH"
+        export PATH="$HOME/.cargo/bin:$PATH"
     fi
 
-    # Configure Poetry to create virtual environments in the project directory
-    poetry config virtualenvs.in-project true
+    # Create a virtual environment in the project directory
+    echo "Creating virtual environment with uv..." | log_with_service_name "uv" "$BLUE"
+    uv venv .venv
 
-    poetry lock
-
-    # Install dependencies and create the virtual environment
-    # pass env vars for as psycopg to build
-    # https://www.psycopg.org/docs/install.html#build-prerequisites
+    # Install pip in the virtual environment
+    echo "Installing pip in the virtual environment..." | log_with_service_name "uv" "$BLUE"
+    source .venv/bin/activate
+    curl -sSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py
+    python get-pip.py
+    rm get-pip.py
+    
+    # Install dependencies
+    echo "Installing dependencies with uv..." | log_with_service_name "uv" "$BLUE"
+    
+    # Set up PostgreSQL environment variables for building psycopg
     if [ "$os" = "Darwin" ]; then
-        PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH" && \
-        LDFLAGS="-L/opt/homebrew/opt/postgresql@17/lib" && \
-        CPPFLAGS="-I/opt/homebrew/opt/postgresql@17/include" && \
-        poetry install
+        export PATH="/opt/homebrew/opt/postgresql@17/bin:$PATH"
+        export LDFLAGS="-L/opt/homebrew/opt/postgresql@17/lib"
+        export CPPFLAGS="-I/opt/homebrew/opt/postgresql@17/include"
     else
-        export PATH="/usr/lib/postgresql/16/bin:$PATH" && \
-        export LDFLAGS="-L/usr/lib/postgresql/16/lib" && \
-        export CPPFLAGS="-I/usr/lib/postgresql/16/include" && \
-        poetry install
+        export PATH="/usr/lib/postgresql/16/bin:$PATH"
+        export LDFLAGS="-L/usr/lib/postgresql/16/lib"
+        export CPPFLAGS="-I/usr/lib/postgresql/16/include"
     fi
-
+    
+    # Install dependencies from pyproject.toml
+    uv pip install .
+    
+    # Install surrealdb version 0.3.2 specifically
+    echo "Installing surrealdb==0.3.2..." | log_with_service_name "uv" "$BLUE"
+    uv pip install surrealdb==0.3.2
+    
     # Verify the presence of a .venv folder within the project directory
     if [ -d ".venv" ]; then
-        echo ".venv folder is present in the project folder." | log_with_service_name "Poetry" "$BLUE"
+        echo ".venv folder is present in the project folder." | log_with_service_name "uv" "$BLUE"
     else
-        echo "Poetry virtual environment setup failed." | log_with_service_name "Poetry" "$BLUE"
+        echo "uv virtual environment setup failed." | log_with_service_name "uv" "$BLUE"
         exit 1
     fi
 }
@@ -737,7 +748,7 @@ start_hub_surrealdb() {
         INIT_PYTHON_PATH="$PWD/node/storage/hub/init_hub.py"
         chmod +x "$INIT_PYTHON_PATH"
 
-        poetry run python "$INIT_PYTHON_PATH" 2>&1
+        uv run python "$INIT_PYTHON_PATH" 2>&1
         PYTHON_EXIT_STATUS=$?
         if [ $PYTHON_EXIT_STATUS -ne 0 ]; then
             echo "Hub DB (SurrealDB) initialization failed. Python script exited with status $PYTHON_EXIT_STATUS." | log_with_service_name "HubDBSurreal" $RED
@@ -755,7 +766,7 @@ start_hub_surrealdb() {
         echo "Not running Hub DB (SurrealDB) locally..." | log_with_service_name "HubDBSurreal" $RED
     fi
 
-    poetry run python "$PWD/node/storage/hub/init_hub.py" --user 2>&1
+    uv run python "$PWD/node/storage/hub/init_hub.py" --user 2>&1
     PYTHON_EXIT_STATUS=$?
     echo "PYTHON_EXIT_STATUS: $PYTHON_EXIT_STATUS"
     if [ $PYTHON_EXIT_STATUS -ne 0 ]; then
@@ -772,7 +783,7 @@ start_local_surrealdb() {
     INIT_PYTHON_PATH="$PWD/node/storage/db/init_db.py"
     chmod +x "$INIT_PYTHON_PATH"
 
-    poetry run python "$INIT_PYTHON_PATH" 2>&1
+    uv run python "$INIT_PYTHON_PATH" 2>&1
     PYTHON_EXIT_STATUS=$?
 
     if [ $PYTHON_EXIT_STATUS -ne 0 ]; then
@@ -820,7 +831,7 @@ check_and_set_private_key() {
     read -p "No valid PRIVATE_KEY set. Would you like to generate one? (yes/no): " response
     if [[ "$response" == "yes" ]]; then
         source .env
-        key_file=$(poetry run python scripts/generate_user.py "$HUB_USERNAME")
+        key_file=$(uv run python scripts/generate_user.py "$HUB_USERNAME")
         key_file=$(echo "$key_file" | tr -d '\n')
         key_file=$(basename "$key_file")
         if [ "$os" = "Darwin" ]; then
@@ -870,7 +881,7 @@ linux_start_servers() {
     # Define paths
     USER_NAME=$(whoami)
     CURRENT_DIR=$(pwd)
-    PYTHON_APP_PATH="$CURRENT_DIR/.venv/bin/poetry"
+    PYTHON_APP_PATH="$CURRENT_DIR/.venv/bin/python"
     WORKING_DIR="$CURRENT_DIR/node"
     ENVIRONMENT_FILE_PATH="$CURRENT_DIR/.env"
 
@@ -885,8 +896,8 @@ Description=Node HTTP Server
 After=network.target
 
 [Service]
-ExecStart=$PYTHON_APP_PATH run python server/server.py --communication-protocol http --port 7001
-WorkingDirectory=$WORKING_DIR
+ExecStart=$PYTHON_APP_PATH $WORKING_DIR/server/server.py --communication-protocol http --port 7001
+WorkingDirectory=$CURRENT_DIR
 EnvironmentFile=$ENVIRONMENT_FILE_PATH
 User=$USER_NAME
 Restart=always
@@ -898,6 +909,7 @@ SendSIGKILL=yes
 # Environment variables for shutdown behavior
 Environment=UVICORN_TIMEOUT=30
 Environment=UVICORN_GRACEFUL_SHUTDOWN=30
+Environment=PATH=$HOME/.local/bin:$HOME/.cargo/bin:${PATH}
 
 [Install]
 WantedBy=multi-user.target
@@ -931,8 +943,8 @@ Description=Node $node_communication_protocol Node Communication Server on port 
 After=network.target nodeapp_http.service
 
 [Service]
-ExecStart=$PYTHON_APP_PATH run python server/server.py --communication-protocol $node_communication_protocol --port $current_port
-WorkingDirectory=$WORKING_DIR
+ExecStart=$PYTHON_APP_PATH $WORKING_DIR/server/server.py --communication-protocol $node_communication_protocol --port $current_port
+WorkingDirectory=$CURRENT_DIR
 EnvironmentFile=$ENVIRONMENT_FILE_PATH
 User=$USER_NAME
 Restart=always
@@ -940,6 +952,7 @@ TimeoutStopSec=3
 KillMode=mixed
 KillSignal=SIGTERM
 SendSIGKILL=yes
+Environment=PATH=$HOME/.local/bin:$HOME/.cargo/bin:${PATH}
 
 [Install]
 WantedBy=multi-user.target
@@ -949,7 +962,7 @@ EOF
         sudo mv /tmp/$SERVICE_FILE /etc/systemd/system/
         sudo systemctl daemon-reload
         if sudo systemctl enable $SERVICE_FILE && sudo systemctl start $SERVICE_FILE; then
-        echo "$node_communication_protocol server service started successfully on port $current_port." | log_with_service_name "Server" $BLUE
+            echo "$node_communication_protocol server service started successfully on port $current_port." | log_with_service_name "Server" $BLUE
         else
             echo "Failed to start $node_communication_protocol server service on port $current_port." | log_with_service_name "Server" $RED
         fi
@@ -974,7 +987,7 @@ darwin_start_servers() {
     # Define paths
     USER_NAME=$(whoami)
     CURRENT_DIR=$(pwd)
-    PYTHON_APP_PATH="$CURRENT_DIR/.venv/bin/poetry"
+    PYTHON_APP_PATH="$CURRENT_DIR/.venv/bin/python" # Changed to use Python directly
     WORKING_DIR="$CURRENT_DIR/node"
     ENVIRONMENT_FILE_PATH="$CURRENT_DIR/.env"
     SURRREALDB_PATH="/usr/local/bin"
@@ -996,22 +1009,22 @@ darwin_start_servers() {
     <key>ProgramArguments</key>
     <array>
         <string>$PYTHON_APP_PATH</string>
-        <string>run</string>
-        <string>python</string>
-        <string>server/server.py</string>
+        <string>$WORKING_DIR/server/server.py</string>
         <string>--communication-protocol</string>
         <string>http</string>
         <string>--port</string>
         <string>7001</string>
     </array>
     <key>WorkingDirectory</key>
-    <string>$WORKING_DIR</string>
+    <string>$CURRENT_DIR</string>
     <key>EnvironmentVariables</key>
     <dict>
+        <key>PYTHONPATH</key>
+        <string>$CURRENT_DIR</string>
         <key>ENVIRONMENT_FILE_PATH</key>
         <string>$ENVIRONMENT_FILE_PATH</string>
         <key>PATH</key>
-        <string>$SURRREALDB_PATH:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <string>$HOME/.local/bin:$HOME/.cargo/bin:$CURRENT_DIR/.venv/bin:$SURRREALDB_PATH:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
@@ -1065,22 +1078,22 @@ EOF
     <key>ProgramArguments</key>
     <array>
         <string>$PYTHON_APP_PATH</string>
-        <string>run</string>
-        <string>python</string>
-        <string>server/server.py</string>
+        <string>$WORKING_DIR/server/server.py</string>
         <string>--communication-protocol</string>
         <string>$node_communication_protocol</string>
         <string>--port</string>
         <string>$current_port</string>
     </array>
     <key>WorkingDirectory</key>
-    <string>$WORKING_DIR</string>
+    <string>$CURRENT_DIR</string>
     <key>EnvironmentVariables</key>
     <dict>
+        <key>PYTHONPATH</key>
+        <string>$CURRENT_DIR</string>
         <key>ENVIRONMENT_FILE_PATH</key>
         <string>$ENVIRONMENT_FILE_PATH</string>
         <key>PATH</key>
-        <string>$SURRREALDB_PATH:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <string>$HOME/.local/bin:$HOME/.cargo/bin:$CURRENT_DIR/.venv/bin:$SURRREALDB_PATH:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
@@ -1125,10 +1138,12 @@ linux_start_celery_worker() {
     WORKING_DIR="$CURRENT_DIR"
     ENVIRONMENT_FILE_PATH="$CURRENT_DIR/.env"
 
-    # Create celery_worker_start.sh
-    echo "#!/bin/bash" > celery_worker_start.sh
-    echo "source $CURRENT_DIR/.venv/bin/activate" >> celery_worker_start.sh
-    echo "exec celery -A node.worker.main.app worker --loglevel=info" >> celery_worker_start.sh
+    # Create celery_worker_start.sh with proper Python path
+    cat > celery_worker_start.sh << EOF
+#!/bin/bash
+export PYTHONPATH=$CURRENT_DIR
+$CURRENT_DIR/.venv/bin/python -m celery -A node.worker.main.app worker --loglevel=info
+EOF
     chmod +x celery_worker_start.sh
 
     # Create temporary systemd service file
@@ -1144,6 +1159,8 @@ WorkingDirectory=$WORKING_DIR
 EnvironmentFile=$ENVIRONMENT_FILE_PATH
 ExecStart=$CURRENT_DIR/celery_worker_start.sh
 Restart=always
+Environment="PYTHONPATH=$CURRENT_DIR"
+Environment=PATH=$HOME/.local/bin:$HOME/.cargo/bin:${PATH}
 
 [Install]
 WantedBy=multi-user.target
@@ -1162,7 +1179,19 @@ EOF
 
     # Check until the Celery worker is up and running by checking the logs
     echo "Waiting for Celery worker to start..." | log_with_service_name "Celery" $GREEN
-    while ! sudo journalctl -u celeryworker.service -n 100 | grep -q "celery@$(hostname) ready"; do
+    
+    # Try for a maximum of 30 seconds
+    for i in {1..30}; do
+        if sudo journalctl -u celeryworker.service -n 100 | grep -q "celery@$(hostname) ready"; then
+            echo "Celery worker started successfully!" | log_with_service_name "Celery" $GREEN
+            break
+        fi
+        
+        if [ $i -eq 30 ]; then
+            echo "Celery worker failed to start within 30 seconds. Check logs for details." | log_with_service_name "Celery" $RED
+            sudo journalctl -u celeryworker.service -n 100 | log_with_service_name "Celery" $RED
+        fi
+        
         sleep 1
     done
 
@@ -1179,7 +1208,7 @@ darwin_start_celery_worker() {
     ENVIRONMENT_FILE_PATH="$CURRENT_DIR/.env"
     EXECUTION_PATH="$CURRENT_DIR/celery_worker_start.sh"
 
-    # Write celery_worker_start.sh with correct venv path
+    # Write celery_worker_start.sh with direct Python path instead of activation
     cat <<EOF > celery_worker_start.sh
 #!/bin/bash
 
@@ -1191,20 +1220,20 @@ log_error() {
     echo "\$(date '+%Y-%m-%d %H:%M:%S') ERROR: \$1" >> /tmp/celeryworker.log
 }
 
-# Check if virtual environment exists
-if [ ! -f "$CURRENT_DIR/.venv/bin/activate" ]; then
-    log_error "Virtual environment not found at $CURRENT_DIR/.venv/bin/activate"
+# Check if virtual environment Python exists
+if [ ! -f "$CURRENT_DIR/.venv/bin/python" ]; then
+    log_error "Python not found at $CURRENT_DIR/.venv/bin/python"
     exit 1
 fi
 
-# Activate virtual environment
-source "$CURRENT_DIR/.venv/bin/activate"
+# Set Python path
+export PYTHONPATH="$CURRENT_DIR"
 
 # Set file descriptor limits
 ulimit -n 65536 || log_error "Failed to set ulimit"
 
-# Start Celery
-exec celery -A node.worker.main.app worker \
+# Start Celery using the Python from virtual environment
+exec "$CURRENT_DIR/.venv/bin/python" -m celery -A node.worker.main.app worker \
     --loglevel=info \
     --concurrency=120 \
     --max-tasks-per-child=100 \
@@ -1229,10 +1258,12 @@ EOF
     <string>$WORKING_DIR</string>
     <key>EnvironmentVariables</key>
     <dict>
+        <key>PYTHONPATH</key>
+        <string>$CURRENT_DIR</string>
         <key>ENVIRONMENT_FILE_PATH</key>
         <string>$ENVIRONMENT_FILE_PATH</string>
         <key>PATH</key>
-        <string>/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+        <string>$HOME/.local/bin:$HOME/.cargo/bin:$CURRENT_DIR/.venv/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     </dict>
     <key>SoftResourceLimits</key>
     <dict>
@@ -1265,6 +1296,25 @@ EOF
     # Load and start
     if launchctl load ~/Library/LaunchAgents/com.example.celeryworker.plist; then
         echo "Celery worker service started successfully." | log_with_service_name "Celery" $GREEN
+        
+        # Monitor the log file for startup success or failure
+        echo "Waiting for Celery worker to initialize..." | log_with_service_name "Celery" $GREEN
+        
+        # Try for a maximum of 30 seconds
+        for i in {1..30}; do
+            if grep -q "celery@.* ready" /tmp/celeryworker.log 2>/dev/null; then
+                echo "Celery worker started successfully!" | log_with_service_name "Celery" $GREEN
+                break
+            fi
+            
+            if [ $i -eq 30 ]; then
+                echo "Warning: Celery worker might not have initialized properly. Check logs." | log_with_service_name "Celery" $YELLOW
+                tail -n 20 /tmp/celeryworker.log | log_with_service_name "Celery" $YELLOW
+            fi
+            
+            sleep 1
+        done
+        
         return 0
     else
         echo "Failed to start Celery worker service." | log_with_service_name "Celery" $RED
@@ -1384,7 +1434,7 @@ linux_start_local_db() {
     chmod +x "$INIT_PYTHON_PATH"
 
     echo "Running init_db.py script..." | log_with_service_name "LocalDBPostgres" $RED
-    poetry run python "$INIT_PYTHON_PATH" 2>&1
+    uv run python "$INIT_PYTHON_PATH" 2>&1
     PYTHON_EXIT_STATUS=$?
 
     if [ $PYTHON_EXIT_STATUS -ne 0 ]; then
@@ -1523,7 +1573,7 @@ darwin_start_local_db() {
     chmod +x "$INIT_PYTHON_PATH"
 
     echo "Running init_db.py script..." | log_with_service_name "LocalDBPostgres" $RED
-    poetry run python "$INIT_PYTHON_PATH" 2>&1
+    uv run python "$INIT_PYTHON_PATH" 2>&1
     PYTHON_EXIT_STATUS=$?
 
     if [ $PYTHON_EXIT_STATUS -ne 0 ]; then
@@ -1548,16 +1598,35 @@ linux_start_litellm() {
     PROJECT_DIR="$CURRENT_DIR/node/inference/litellm"
     VENV_PATH="$PROJECT_DIR/.venv/bin"
     
-    # Install dependencies using poetry with --no-root flag
-    echo "Installing LiteLLM dependencies..." | log_with_service_name "LiteLLM" $BLUE
+    # Create and set up virtual environment for LiteLLM
+    echo "Setting up LiteLLM environment..." | log_with_service_name "LiteLLM" $BLUE
     cd $PROJECT_DIR
-    poetry install --no-root
+    
+    # Create a separate virtual environment for LiteLLM
+    uv venv
+    
+    # Install pip in the LiteLLM virtual environment
+    echo "Installing pip in the virtual environment..." | log_with_service_name "LiteLLM" $BLUE
+    curl -sSL https://bootstrap.pypa.io/get-pip.py | $VENV_PATH/python -
+    
+    # Install LiteLLM from the pyproject.toml
+    echo "Installing LiteLLM dependencies from pyproject.toml..." | log_with_service_name "LiteLLM" $BLUE
+    $VENV_PATH/pip install -e .
     
     # Generate LiteLLM config using main project's venv
     echo "Generating LiteLLM config..." | log_with_service_name "LiteLLM" $BLUE
     cd $CURRENT_DIR
-    PYTHONPATH=$CURRENT_DIR $CURRENT_DIR/.venv/bin/poetry run python $PROJECT_DIR/generate_litellm_config.py
+    PYTHONPATH=$CURRENT_DIR $CURRENT_DIR/.venv/bin/python $PROJECT_DIR/generate_litellm_config.py
     cd $PROJECT_DIR
+    
+    # Create startup script for LiteLLM - using the litellm command directly
+    cat > $PROJECT_DIR/start_litellm.sh << EOF
+#!/bin/bash
+export PYTHONPATH=$PROJECT_DIR
+exec $VENV_PATH/litellm --config $PROJECT_DIR/litellm_config.yml
+EOF
+    
+    chmod +x $PROJECT_DIR/start_litellm.sh
     
     # Create systemd service file
     cat > /tmp/litellm.service << EOF
@@ -1570,8 +1639,9 @@ Type=simple
 User=$USER
 WorkingDirectory=$PROJECT_DIR
 Environment=PATH=$VENV_PATH:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONPATH=$PROJECT_DIR
 EnvironmentFile=$CURRENT_DIR/.env
-ExecStart=$VENV_PATH/litellm --config $PROJECT_DIR/litellm_config.yml
+ExecStart=$PROJECT_DIR/start_litellm.sh
 Restart=always
 RestartSec=3
 
@@ -1585,16 +1655,24 @@ EOF
     sudo systemctl enable litellm
     sudo systemctl start litellm
 
-    # Check service status
+    # Check service status with improved error handling
     echo "Checking LiteLLM service status..." | log_with_service_name "LiteLLM" $BLUE
-    sleep 5
-    if sudo systemctl is-active --quiet litellm; then
-        echo "LiteLLM proxy server started successfully." | log_with_service_name "LiteLLM" $GREEN
-    else
-        echo "Failed to start LiteLLM proxy server. Checking logs..." | log_with_service_name "LiteLLM" $RED
-        sudo journalctl -u litellm --no-pager -n 50
-        exit 1
-    fi
+    
+    # Check several times with increasing sleep intervals
+    for attempt in 1 2 3; do
+        sleep $((attempt * 2))
+        if sudo systemctl is-active --quiet litellm; then
+            echo "LiteLLM proxy server started successfully on attempt $attempt." | log_with_service_name "LiteLLM" $GREEN
+            return 0
+        else
+            echo "LiteLLM start attempt $attempt failed, waiting longer..." | log_with_service_name "LiteLLM" $YELLOW
+        fi
+    done
+    
+    # If we reach here, all attempts failed
+    echo "Failed to start LiteLLM proxy server after multiple attempts. Checking logs..." | log_with_service_name "LiteLLM" $RED
+    sudo journalctl -u litellm --no-pager -n 50
+    exit 1
 }
 
 darwin_start_litellm() {
@@ -1605,16 +1683,35 @@ darwin_start_litellm() {
     PROJECT_DIR="$CURRENT_DIR/node/inference/litellm"
     VENV_PATH="$PROJECT_DIR/.venv/bin"
     
-    # Install dependencies using poetry with --no-root flag
-    echo "Installing LiteLLM dependencies..." | log_with_service_name "LiteLLM" $BLUE
+    # Create and set up virtual environment for LiteLLM
+    echo "Setting up LiteLLM environment..." | log_with_service_name "LiteLLM" $BLUE
     cd $PROJECT_DIR
-    poetry install --no-root
+    
+    # Create a separate virtual environment for LiteLLM
+    uv venv
+    
+    # Install pip in the LiteLLM virtual environment
+    echo "Installing pip in the virtual environment..." | log_with_service_name "LiteLLM" $BLUE
+    curl -sSL https://bootstrap.pypa.io/get-pip.py | $VENV_PATH/python -
+    
+    # Install LiteLLM from the pyproject.toml
+    echo "Installing LiteLLM dependencies from pyproject.toml..." | log_with_service_name "LiteLLM" $BLUE
+    $VENV_PATH/pip install -e .
     
     # Generate LiteLLM config using main project's venv
     echo "Generating LiteLLM config..." | log_with_service_name "LiteLLM" $BLUE
     cd $CURRENT_DIR
-    PYTHONPATH=$CURRENT_DIR $CURRENT_DIR/.venv/bin/poetry run python $PROJECT_DIR/generate_litellm_config.py
+    PYTHONPATH=$CURRENT_DIR $CURRENT_DIR/.venv/bin/python $PROJECT_DIR/generate_litellm_config.py
     cd $PROJECT_DIR
+    
+    # Create startup script for LiteLLM - using the litellm command directly
+    cat > $PROJECT_DIR/start_litellm.sh << EOF
+#!/bin/bash
+export PYTHONPATH=$PROJECT_DIR
+exec $VENV_PATH/litellm --config $PROJECT_DIR/litellm_config.yml
+EOF
+    
+    chmod +x $PROJECT_DIR/start_litellm.sh
 
     # Create launchd plist file
     cat > ~/Library/LaunchAgents/com.litellm.proxy.plist << EOF
@@ -1626,9 +1723,7 @@ darwin_start_litellm() {
     <string>com.litellm.proxy</string>
     <key>ProgramArguments</key>
     <array>
-        <string>$VENV_PATH/litellm</string>
-        <string>--config</string>
-        <string>$PROJECT_DIR/litellm_config.yml</string>
+        <string>$PROJECT_DIR/start_litellm.sh</string>
     </array>
     <key>WorkingDirectory</key>
     <string>$PROJECT_DIR</string>
@@ -1636,6 +1731,8 @@ darwin_start_litellm() {
     <dict>
         <key>PATH</key>
         <string>$VENV_PATH:/usr/local/bin:/usr/bin:/bin</string>
+        <key>PYTHONPATH</key>
+        <string>$PROJECT_DIR</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
@@ -1653,15 +1750,24 @@ EOF
     launchctl unload ~/Library/LaunchAgents/com.litellm.proxy.plist 2>/dev/null || true
     launchctl load ~/Library/LaunchAgents/com.litellm.proxy.plist
 
-    # Check if service is running
-    sleep 5
-    if pgrep -f "litellm --config" > /dev/null; then
-        echo "LiteLLM proxy server started successfully." | log_with_service_name "LiteLLM" $GREEN
-    else
-        echo "Failed to start LiteLLM proxy server. Check logs at /tmp/litellm.log" | log_with_service_name "LiteLLM" $RED
-        tail -n 50 /tmp/litellm.error.log
-        exit 1
-    fi
+    # Check if service is running with improved error handling
+    echo "Checking if LiteLLM service is running..." | log_with_service_name "LiteLLM" $BLUE
+    
+    # Try multiple times with increasing wait periods
+    for attempt in 1 2 3; do
+        sleep $((attempt * 2))
+        if pgrep -f "litellm.*config" > /dev/null; then
+            echo "LiteLLM proxy server started successfully on attempt $attempt." | log_with_service_name "LiteLLM" $GREEN
+            return 0
+        else
+            echo "LiteLLM start attempt $attempt failed, waiting longer..." | log_with_service_name "LiteLLM" $YELLOW
+        fi
+    done
+    
+    # If we reach here, all attempts failed
+    echo "Failed to start LiteLLM proxy server after multiple attempts. Check logs:" | log_with_service_name "LiteLLM" $RED
+    tail -n 50 /tmp/litellm.log
+    exit 1
 }
 
 startup_summary() {
@@ -2143,9 +2249,9 @@ main() {
         if [ "$os" = "Darwin" ]; then
             install_python312
             darwin_install_miniforge
-            darwin_clean_node
+            # darwin_clean_node
             darwin_setup_local_db
-            setup_poetry
+            setup_uv
             install_surrealdb
             check_and_copy_env
             darwin_install_ollama
@@ -2161,9 +2267,9 @@ main() {
         else
             install_python312
             linux_install_miniforge
-            linux_clean_node
+            # linux_clean_node
             linux_setup_local_db
-            setup_poetry
+            setup_uv
             install_surrealdb
             check_and_copy_env
             linux_install_ollama

@@ -54,7 +54,6 @@ services:
     env_file:
       - ./.env
     volumes:
-      - ./node/config.py:/app/node/config/config.py
       - ./node/storage/db/alembic/versions:/app/node/storage/db/alembic/versions
       - ./node/storage/fs:/app/node/storage/fs
       - ./node/storage/hub/modules:/app/node/storage/hub/modules
