@@ -366,6 +366,7 @@ def install_module(module_name: str, module_version: str, module_source_url: str
     logger.debug(f"Module path exists: {modules_source_dir.exists()}")
 
     try:
+        # Handle different source types
         if "ipfs://" in module_source_url:
             install_module_from_ipfs(module_name, module_version, module_source_url)
         else:
@@ -374,23 +375,34 @@ def install_module(module_name: str, module_version: str, module_source_url: str
         # Create virtual environment using UV directly in the module folder
         subprocess.run(["uv", "venv", ".venv"], check=True, cwd=modules_source_dir)
         
-        # Install pip in the virtual environment
-        venv_dir = modules_source_dir / ".venv"
-        python_path = venv_dir / "bin" / "python"
+        # Get the path to the Python executable in the venv
+        if sys.platform == "win32":
+            python_path = str(modules_source_dir / ".venv" / "Scripts" / "python")
+        else:
+            python_path = str(modules_source_dir / ".venv" / "bin" / "python")
         
-        # Install pip in the virtual environment
-        venv_dir = modules_source_dir / ".venv"
-        python_path = venv_dir / "bin" / "python"
-        subprocess.run([
-            str(python_path), "-c",
-            "import sys; from urllib.request import urlopen; exec(urlopen('https://bootstrap.pypa.io/get-pip.py').read())"
-        ], check=True)
-
-        python_path = str(venv_dir / "bin" / "python")
-        install_cmd = ["uv", "pip", "install", "--python", python_path, "-e", "."]
-        proc = subprocess.run(install_cmd, capture_output=True, text=True, cwd=modules_source_dir)
+        # Install the package in editable mode in the venv
+        # Using uv pip install with --python to specify the venv interpreter
+        install_cmd = [
+            "uv", "pip", "install", 
+            "--python", python_path,
+            "-e", ".",  # Install in editable mode
+            "--no-cache"  # Ensure fresh install
+        ]
+        
+        proc = subprocess.run(
+            install_cmd, 
+            capture_output=True, 
+            text=True, 
+            cwd=modules_source_dir
+        )
+        
+        if proc.returncode != 0:
+            logger.error(f"Installation failed: {proc.stderr}")
+            raise RuntimeError(f"Failed to install {module_name}: {proc.stderr}")
+            
         logger.info(f"Pip install stdout: {proc.stdout}")
-        logger.info(f"Pip install stderr: {proc.stderr}")
+        logger.debug(f"Pip install stderr: {proc.stderr}")
 
         if not verify_module_installation(module_name):
             raise RuntimeError(f"Module {module_name} failed verification after installation")
