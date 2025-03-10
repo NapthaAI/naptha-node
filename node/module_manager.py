@@ -401,8 +401,8 @@ def install_module(module_name: str, module_version: str, module_source_url: str
             logger.error(f"Installation failed: {proc.stderr}")
             raise RuntimeError(f"Failed to install {module_name}: {proc.stderr}")
             
-        logger.info(f"Pip install stdout: {proc.stdout}")
-        logger.info(f"Pip install stderr: {proc.stderr}")
+        logger.debug(f"Pip install stdout: {proc.stdout}")
+        logger.debug(f"Pip install stderr: {proc.stderr}")
 
         if not verify_module_installation(module_name):
             raise RuntimeError(f"Module {module_name} failed verification after installation")
