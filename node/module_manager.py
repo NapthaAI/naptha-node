@@ -389,8 +389,8 @@ def install_module(module_name: str, module_version: str, module_source_url: str
         python_path = str(venv_dir / "bin" / "python")
         install_cmd = ["uv", "pip", "install", "--python", python_path, "-e", "."]
         proc = subprocess.run(install_cmd, capture_output=True, text=True, cwd=modules_source_dir)
-        logger.debug(f"Pip install stdout: {proc.stdout}")
-        logger.debug(f"Pip install stderr: {proc.stderr}")
+        logger.info(f"Pip install stdout: {proc.stdout}")
+        logger.info(f"Pip install stderr: {proc.stderr}")
 
         if not verify_module_installation(module_name):
             raise RuntimeError(f"Module {module_name} failed verification after installation")
