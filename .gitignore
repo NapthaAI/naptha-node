@@ -197,3 +197,4 @@ user_private.pem
 *.pem
 node/inference/ollama/.gitkeep
 node/inference/litellm/start_litellm.sh
+node/mpc/start_mpc.sh
