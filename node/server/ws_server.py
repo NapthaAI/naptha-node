@@ -7,7 +7,7 @@ import websockets
 from datetime import datetime
 import traceback
 import logging
-from typing import Dict, Any, Union
+from typing import Dict, Any, Union, Optional, List
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,6 +20,7 @@ from node.schemas import (
     KBRunInput, KBDeployment, 
     OrchestratorRunInput, OrchestratorDeployment,
     ModuleExecutionType,
+    SecretInput
 )
 from node.storage.db.db import LocalDBPostgres
 from node.user import register_user, check_user
@@ -34,6 +35,7 @@ from node.worker.package_worker import (
 
 )
 from node.module_manager import setup_module_deployment
+from node.secret import Secret
 
 logger = logging.getLogger(__name__)
 load_dotenv()
@@ -252,8 +254,13 @@ class WebSocketServer:
                 try:
                     data = await websocket.receive_json()
                     logger.info(f"Endpoint: run_{module_type} :: Received data: {data}")
+                    if data.get('secrets'):
+                        secrets = data.pop('secrets')
+                        logger.info(f"Endpoint: run_{module_type} :: Received1 secrets: {secrets}")
+                    else:
+                        secrets = []
 
-                    result = await self.run_module(module_type, data, client_id)
+                    result = await self.run_module(module_type, data, client_id, [SecretInput(**secret) for secret in secrets] if secrets else [])
                     logger.info(f"Endpoint: run_{module_type} :: Sending result: {result}")
                     await self.manager.send_message(result, client_id, f"run_{module_type}")
 
@@ -283,7 +290,7 @@ class WebSocketServer:
             logger.warning(f"Client {client_id} disconnected (outer).")
             self.manager.disconnect(client_id, f"run_{module_type}")
 
-    async def run_module(self, module_type: str, data: dict, client_id: str) -> str:
+    async def run_module(self, module_type: str, data: dict, client_id: str, secrets: List[SecretInput] = []) -> str:
         try:
             # Map module types to their corresponding input and run classes
             module_configs = {
@@ -355,8 +362,13 @@ class WebSocketServer:
             else:
                 execution_type = module_run.deployment.module.execution_type
 
+            secret_obj = Secret()
+            user_env_data = {}
+            for secret in secrets:
+                user_env_data[secret.key_name] = secret_obj.decrypt_rsa(secret.secret_value)
+	
             if execution_type == ModuleExecutionType.package or execution_type == 'package':
-                task = config["worker"].delay(module_run_data)
+                task = config["worker"].delay(module_run_data, user_env_data, [secret.model_dump() for secret in secrets] if secrets else [])
             elif execution_type == ModuleExecutionType.docker or execution_type == 'docker':
                 task = execute_docker_agent.delay(module_run_data)
             else:

@@ -123,13 +123,20 @@ class HTTPServer:
             return await self.agent_create(agent_input)
 
         @router.post("/agent/run")
-        async def agent_run_endpoint(agent_run_input: AgentRunInput, secrets: List[SecretInput] = []) -> AgentRun:
+        async def agent_run_endpoint(payload: dict) -> AgentRun:
             """
             Run an agent
-            :param agent_run_input: Agent run specifications
-            :param secrets: Optional list of secrets to pass to the agent
+            :param payload: Agent run specifications
             :return: Status
             """
+            if payload.get("agent_run_input"):
+                agent_run_input = AgentRunInput(**payload.get("agent_run_input", {}))
+                secrets_dict = payload.get("secrets", [])
+                secrets = [SecretInput(**secret) for secret in secrets_dict]
+            else:
+                agent_run_input = AgentRunInput(**payload)
+                secrets = []
+
             return await self.agent_run(agent_run_input, secrets)
 
         @router.post("/agent/check") 
@@ -151,13 +158,20 @@ class HTTPServer:
             return await self.tool_create(tool_input)
 
         @router.post("/tool/run")
-        async def tool_run_endpoint(tool_run_input: ToolRunInput, secrets: List[SecretInput] = []) -> ToolRun:
+        async def tool_run_endpoint(payload: dict) -> ToolRun:
             """
             Run a tool
-            :param tool_run_input: Tool run specifications
-            :param secrets: Optional list of secrets to pass to the tool
+            :param payload: Tool run specifications
             :return: Status
             """
+            if payload.get("tool_run_input"):
+                tool_run_input = ToolRunInput(**payload.get("tool_run_input", {}))
+                secrets_dict = payload.get("secrets", [])
+                secrets = [SecretInput(**secret) for secret in secrets_dict]
+            else:
+                tool_run_input = ToolRunInput(**payload)
+                secrets = []
+
             return await self.tool_run(tool_run_input, secrets)
 
         @router.post("/tool/check")
@@ -179,13 +193,21 @@ class HTTPServer:
             return await self.orchestrator_create(orchestrator_input)
         
         @router.post("/orchestrator/run")
-        async def orchestrator_run_endpoint(orchestrator_run_input: OrchestratorRunInput, secrets: List[SecretInput] = []) -> OrchestratorRun:
+        async def orchestrator_run_endpoint(payload: dict) -> OrchestratorRun:
             """
             Run an agent orchestrator
-            :param orchestrator_run_input: Orchestrator run specifications
-            :param secrets: Optional list of secrets to pass to the orchestrator
+            :param payload: Orchestrator run specifications
             :return: Status
             """
+            logger.info(f"Orchestrator run payload: {payload}")
+            if payload.get("orchestrator_run_input"):
+                orchestrator_run_input = OrchestratorRunInput(**payload.get("orchestrator_run_input", {}))
+                secrets_dict = payload.get("secrets", [])
+                secrets = [SecretInput(**secret) for secret in secrets_dict]
+            else:
+                orchestrator_run_input = OrchestratorRunInput(**payload)
+                secrets = []
+
             return await self.orchestrator_run(orchestrator_run_input, secrets)
 
         @router.post("/orchestrator/check")
@@ -207,13 +229,19 @@ class HTTPServer:
             return await self.environment_create(environment_input)
 
         @router.post("/environment/run")
-        async def environment_run_endpoint(environment_run_input: EnvironmentRunInput, secrets: List[SecretInput] = []) -> EnvironmentRun:
+        async def environment_run_endpoint(payload: dict) -> EnvironmentRun:
             """
             Run an environment
-            :param environment_run_input: Environment run specifications 
-            :param secrets: Optional list of secrets to pass to the environment
+            :param payload: Environment run specifications
             :return: Status
             """
+            if payload.get("environment_run_input"):
+                environment_run_input = EnvironmentRunInput(**payload.get("environment_run_input", {}))
+                secrets_dict = payload.get("secrets", [])
+                secrets = [SecretInput(**secret) for secret in secrets_dict]
+            else:
+                environment_run_input = EnvironmentRunInput(**payload)
+                secrets = []
             return await self.environment_run(environment_run_input, secrets)
 
         @router.post("/environment/check")
@@ -235,13 +263,19 @@ class HTTPServer:
             return await self.kb_create(kb_input)
         
         @router.post("/kb/run")
-        async def kb_run_endpoint(kb_run_input: KBRunInput, secrets: List[SecretInput] = []) -> KBRun:
+        async def kb_run_endpoint(payload: dict) -> KBRun:
             """
             Run a knowledge base
-            :param kb_run_input: KBRunInput
-            :param secrets: Optional list of secrets to pass to the knowledge base
+            :param payload: KB run specifications
             :return: KBRun
             """
+            if payload.get("kb_run_input"):
+                kb_run_input = KBRunInput(**payload.get("kb_run_input", {}))
+                secrets_dict = payload.get("secrets", [])
+                secrets = [SecretInput(**secret) for secret in secrets_dict]
+            else:
+                kb_run_input = KBRunInput(**payload)
+                secrets = []
             return await self.kb_run(kb_run_input, secrets)
 
         @router.post("/kb/check")
@@ -263,13 +297,19 @@ class HTTPServer:
             return await self.memory_create(memory_input)
 
         @router.post("/memory/run")
-        async def memory_run_endpoint(memory_run_input: MemoryRunInput, secrets: List[SecretInput] = [] ) -> MemoryRun:
+        async def memory_run_endpoint(payload: dict) -> MemoryRun:
             """
             Run a memory module
-            :param memory_run_input: Memory run specifications
-            :param secrets: Optional list of secrets to pass to the memory
+            :param payload: Memory run specifications
             :return: Status
             """
+            if payload.get("memory_run_input"):
+                memory_run_input = MemoryRunInput(**payload.get("memory_run_input", {}))
+                secrets_dict = payload.get("secrets", [])
+                secrets = [SecretInput(**secret) for secret in secrets_dict]
+            else:
+                memory_run_input = MemoryRunInput(**payload)
+                secrets = []
             return await self.memory_run(memory_run_input, secrets)
 
         @router.post("/memory/check")
@@ -297,35 +337,6 @@ class HTTPServer:
             if '_sa_instance_state' in response:
                 response.pop('_sa_instance_state')
             return response
-        
-        @router.post("/user/secret/create")
-        async def user_secret_create_endpoint(
-            existing_secrets: List[SecretInput] = [], 
-            secrets: List[SecretInput] = [], 
-            signature: str = Query(...), 
-            is_update: Optional[bool] = Query(False)
-        ):
-            user_id = secrets[0].user_id.replace("<record>", "") if secrets else ""
-            
-            if not user_id:
-                raise HTTPException(status_code=400, detail=f"Data cannot be empty")
-            
-            if not verify_signature(user_id, signature, user_id.split(":")[1]):
-                raise HTTPException(status_code=401, detail="Unauthorized: Invalid signature")
-            
-            try:
-                aes_secret = base64.b64decode(os.getenv("AES_SECRET"))
-                for data in secrets:
-                    rsa_decrypted_secret_value = self.secret.decrypt_rsa(data.secret_value)
-                    encrypted_secret_value = self.secret.encrypt_with_aes(rsa_decrypted_secret_value, aes_secret)
-                    data.secret_value = encrypted_secret_value
-                
-                async with HubDBSurreal() as hub:
-                    result = await hub.create_secret(secrets, is_update, existing_secrets)
-                
-                return result
-            except Exception as e:
-                raise HTTPException(status_code=400, detail=f"Error processing secrets: {str(e)}")
 
         async def get_server_connection(self, server_id: str):
             """
@@ -461,7 +472,7 @@ class HTTPServer:
             secret = Secret()
                     
             for record in secrets:
-                decrypted_value = secret.decrypt_with_aes(record.secret_value, base64.b64decode(os.getenv("AES_SECRET")))
+                decrypted_value = secret.decrypt_rsa(record.secret_value)
                 user_env_data[record.key_name] = decrypted_value
 
             # Create module run record in DB
@@ -478,17 +489,17 @@ class HTTPServer:
             # Execute the task based on module type
             if module_run_input.deployment.module.execution_type == ModuleExecutionType.package:
                 if module_type == "agent":
-                    _ = run_agent.delay(module_run_data, user_env_data)
+                    _ = run_agent.delay(module_run_data, user_env_data, [secret.model_dump() for secret in secrets] if secrets else [])
                 elif module_type == "tool":
-                    _ = run_tool.delay(module_run_data, user_env_data)
+                    _ = run_tool.delay(module_run_data, user_env_data, [secret.model_dump() for secret in secrets] if secrets else [])
                 elif module_type == "orchestrator":
-                    _ = run_orchestrator.delay(module_run_data, user_env_data)
+                    _ = run_orchestrator.delay(module_run_data, user_env_data, [secret.model_dump() for secret in secrets] if secrets else [])
                 elif module_type == "environment":
-                    _ = run_environment.delay(module_run_data, user_env_data)
+                    _ = run_environment.delay(module_run_data, user_env_data, [secret.model_dump() for secret in secrets] if secrets else [])
                 elif module_type == "kb":
-                    _ = run_kb.delay(module_run_data, user_env_data)
+                    _ = run_kb.delay(module_run_data, user_env_data, [secret.model_dump() for secret in secrets] if secrets else [])
                 elif module_type == "memory":
-                    _ = run_memory.delay(module_run_data, user_env_data)                   
+                    _ = run_memory.delay(module_run_data, user_env_data, [secret.model_dump() for secret in secrets] if secrets else [])                   
             elif module_run_input.deployment.module.execution_type == ModuleExecutionType.docker and module_type == "agent":
                 # validate docker params
                 try:

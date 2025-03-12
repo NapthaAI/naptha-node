@@ -279,7 +279,6 @@ if __name__ == "__main__":
 
     secret = Secret(server_private_key_path, server_public_key_path, env_file_path)
     secret.check_and_generate_keys()
-    secret.check_and_generate_aes_secret()
 
     asyncio.run(run_server(
         communication_protocol=args.communication_protocol,

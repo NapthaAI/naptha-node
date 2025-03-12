@@ -65,6 +65,11 @@ message NodeConfig {
     repeated string models = 21;
 }
 
+message Secret {
+    string user_id = 1;
+    string secret_value = 2;
+    string key_name = 3;
+}
 
 message Module {
     string id = 1;
@@ -140,6 +145,7 @@ message ModuleRunRequest {
     }
     repeated ModuleRun orchestrator_runs = 9;
     optional string signature = 10;
+    repeated Secret secrets = 11;
 }
 
 message ModuleRun {
