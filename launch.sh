@@ -701,10 +701,6 @@ setup_uv() {
     # Install dependencies from pyproject.toml
     uv pip install .
     
-    # Install surrealdb version 0.3.2 specifically
-    echo "Installing surrealdb==0.3.2..." | log_with_service_name "uv" "$BLUE"
-    uv pip install surrealdb==0.3.2
-    
     # Verify the presence of a .venv folder within the project directory
     if [ -d ".venv" ]; then
         echo ".venv folder is present in the project folder." | log_with_service_name "uv" "$BLUE"
@@ -1611,8 +1607,9 @@ linux_start_litellm() {
     
     # Install LiteLLM from the pyproject.toml
     echo "Installing LiteLLM dependencies from pyproject.toml..." | log_with_service_name "LiteLLM" $BLUE
-    $VENV_PATH/pip install -e .
-    
+    uv lock
+    uv sync
+
     # Generate LiteLLM config using main project's venv
     echo "Generating LiteLLM config..." | log_with_service_name "LiteLLM" $BLUE
     cd $CURRENT_DIR
@@ -1672,6 +1669,7 @@ EOF
     # If we reach here, all attempts failed
     echo "Failed to start LiteLLM proxy server after multiple attempts. Checking logs..." | log_with_service_name "LiteLLM" $RED
     sudo journalctl -u litellm --no-pager -n 50
+    cd $CURRENT_DIR
     exit 1
 }
 
@@ -1696,7 +1694,8 @@ darwin_start_litellm() {
     
     # Install LiteLLM from the pyproject.toml
     echo "Installing LiteLLM dependencies from pyproject.toml..." | log_with_service_name "LiteLLM" $BLUE
-    $VENV_PATH/pip install -e .
+    uv lock
+    uv sync
     
     # Generate LiteLLM config using main project's venv
     echo "Generating LiteLLM config..." | log_with_service_name "LiteLLM" $BLUE
@@ -1767,6 +1766,7 @@ EOF
     # If we reach here, all attempts failed
     echo "Failed to start LiteLLM proxy server after multiple attempts. Check logs:" | log_with_service_name "LiteLLM" $RED
     tail -n 50 /tmp/litellm.log
+    cd $CURRENT_DIR
     exit 1
 }
 
@@ -1924,6 +1924,21 @@ else:
             logs+=("$(sudo journalctl -u litellm -n 20)")
         fi
     fi
+    
+    # Check MPC Server - NEW
+    services+=("MPC_Server")
+    MPC_PORT=${MPC_SERVER_PORT:-8000}
+    if curl -s http://localhost:$MPC_PORT/health > /dev/null; then
+        statuses+=("✅")
+        logs+=("")
+    else
+        statuses+=("❌")
+        if [ "$os" = "Darwin" ]; then
+            logs+=("$(tail -n 20 /tmp/mpc.log 2>/dev/null || echo 'Log file not found')")
+        else
+            logs+=("$(sudo journalctl -u mpc -n 20)")
+        fi
+    fi
 
     # Print formatted summary
     echo -e "\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" | log_with_service_name "Summary" $BLUE
@@ -1960,7 +1975,7 @@ else:
     else
         echo -e "\n✨ All services started successfully!" | log_with_service_name "Summary" $GREEN
     fi
-}   
+}
 
 print_logo(){
     printf """
@@ -2238,6 +2253,274 @@ EOF
     fi
 }
 
+# Function to start MPC server on Linux
+linux_start_mpc() {
+    echo "Starting MPC server..." | log_with_service_name "MPC" $BLUE
+    
+    # Get absolute paths and fix current directory issue
+    ORIGINAL_DIR=$(pwd)
+    echo "Current directory: $ORIGINAL_DIR" | log_with_service_name "MPC" $BLUE
+    
+    # If we're inside a nested directory, navigate back to the project root
+    if [[ "$ORIGINAL_DIR" == *"/node/inference/litellm"* ]]; then
+        echo "Detected nested directory, navigating back to project root..." | log_with_service_name "MPC" $BLUE
+        cd "$ORIGINAL_DIR/../../.." # Go back up from /node/inference/litellm to project root
+        PROJECT_ROOT=$(pwd)
+        echo "Adjusted to project root: $PROJECT_ROOT" | log_with_service_name "MPC" $BLUE
+    else
+        PROJECT_ROOT="$ORIGINAL_DIR"
+    fi
+    
+    MPC_DIR="$PROJECT_ROOT/node/mpc"
+    VENV_PATH="$MPC_DIR/.venv/bin"
+    MPC_PORT=${MPC_SERVER_PORT:-8000}
+    
+    echo "MPC server will run on port $MPC_PORT" | log_with_service_name "MPC" $BLUE
+    
+    # Create and set up virtual environment for MPC
+    echo "Setting up MPC server environment..." | log_with_service_name "MPC" $BLUE
+    
+    # Check if MPC directory exists
+    if [ ! -d "$MPC_DIR" ]; then
+        echo "MPC directory not found at $MPC_DIR, attempting to locate it..." | log_with_service_name "MPC" $RED
+        # Try to find the correct directory - limited to searching under PROJECT_ROOT/node
+        POSSIBLE_MPC_DIR=$(find "$PROJECT_ROOT/node" -type d -name "mpc" 2>/dev/null | grep -v "node_modules" | head -n 1)
+        if [ -n "$POSSIBLE_MPC_DIR" ]; then
+            echo "Found possible MPC directory at $POSSIBLE_MPC_DIR" | log_with_service_name "MPC" $BLUE
+            MPC_DIR="$POSSIBLE_MPC_DIR"
+        else
+            echo "Could not find MPC directory. Aborting." | log_with_service_name "MPC" $RED
+            cd "$ORIGINAL_DIR"
+            return 1
+        fi
+    fi
+    
+    echo "Using MPC directory: $MPC_DIR" | log_with_service_name "MPC" $BLUE
+    
+    cd "$MPC_DIR" || {
+        echo "Failed to change to MPC directory: $MPC_DIR" | log_with_service_name "MPC" $RED
+        cd "$ORIGINAL_DIR"
+        return 1
+    }
+    
+    # Create a separate virtual environment for MPC
+    if [ ! -d ".venv" ]; then
+        echo "Creating virtual environment for MPC..." | log_with_service_name "MPC" $BLUE
+        uv venv
+        
+        # Install pip in the MPC virtual environment
+        echo "Installing pip in the virtual environment..." | log_with_service_name "MPC" $BLUE
+        curl -sSL https://bootstrap.pypa.io/get-pip.py | $VENV_PATH/python -
+        
+        # Install dependencies from pyproject.toml
+        echo "Installing MPC dependencies from pyproject.toml..." | log_with_service_name "MPC" $BLUE
+        uv lock
+        uv sync
+    else
+        echo "Virtual environment for MPC already exists." | log_with_service_name "MPC" $BLUE
+    fi
+    
+    # Create startup script for MPC
+    cat > $MPC_DIR/start_mpc.sh << EOF
+#!/bin/bash
+export PYTHONPATH=$PROJECT_ROOT
+cd $MPC_DIR
+exec $VENV_PATH/python $MPC_DIR/server.py --port $MPC_PORT
+EOF
+    
+    chmod +x $MPC_DIR/start_mpc.sh
+    
+    # Create systemd service file
+    cat > /tmp/mpc.service << EOF
+[Unit]
+Description=Naptha MPC Server
+After=network.target
+
+[Service]
+Type=simple
+User=$USER
+WorkingDirectory=$MPC_DIR
+Environment=PATH=$VENV_PATH:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONPATH=$PROJECT_ROOT
+EnvironmentFile=$PROJECT_ROOT/.env
+ExecStart=$MPC_DIR/start_mpc.sh
+Restart=always
+RestartSec=3
+TimeoutStopSec=90
+KillMode=mixed
+KillSignal=SIGTERM
+SendSIGKILL=yes
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    # Move service file and start service
+    sudo mv /tmp/mpc.service /etc/systemd/system/
+    sudo systemctl daemon-reload
+    sudo systemctl enable mpc
+    sudo systemctl start mpc
+    
+    # Return to original directory
+    cd "$ORIGINAL_DIR"
+
+    # Check service status with improved error handling
+    echo "Checking MPC service status..." | log_with_service_name "MPC" $BLUE
+    
+    # Check several times with increasing sleep intervals
+    for attempt in 1 2 3; do
+        sleep $((attempt * 2))
+        if sudo systemctl is-active --quiet mpc; then
+            echo "MPC server started successfully on attempt $attempt." | log_with_service_name "MPC" $GREEN
+            return 0
+        else
+            echo "MPC start attempt $attempt failed, waiting longer..." | log_with_service_name "MPC" $YELLOW
+        fi
+    done
+    
+    # If we reach here, all attempts failed
+    echo "Failed to start MPC server after multiple attempts. Checking logs..." | log_with_service_name "MPC" $RED
+    sudo journalctl -u mpc --no-pager -n 50
+    return 1
+}
+
+# Function to start MPC server on macOS
+darwin_start_mpc() {
+    echo "Starting MPC server..." | log_with_service_name "MPC" $BLUE
+    
+    # Get absolute paths and fix current directory issue
+    ORIGINAL_DIR=$(pwd)
+    echo "Current directory: $ORIGINAL_DIR" | log_with_service_name "MPC" $BLUE
+    
+    # If we're inside a nested directory, navigate back to the project root
+    if [[ "$ORIGINAL_DIR" == *"/node/inference/litellm"* ]]; then
+        echo "Detected nested directory, navigating back to project root..." | log_with_service_name "MPC" $BLUE
+        cd "$ORIGINAL_DIR/../../../.." # Go back up from /node/inference/litellm to project root
+        PROJECT_ROOT=$(pwd)
+        echo "Adjusted to project root: $PROJECT_ROOT" | log_with_service_name "MPC" $BLUE
+    else
+        PROJECT_ROOT="$ORIGINAL_DIR"
+    fi
+    
+    MPC_DIR="$PROJECT_ROOT/node/mpc"
+    VENV_PATH="$MPC_DIR/.venv/bin"
+    MPC_PORT=${MPC_SERVER_PORT:-8000}
+    
+    echo "MPC server will run on port $MPC_PORT" | log_with_service_name "MPC" $BLUE
+    
+    # Create and set up virtual environment for MPC
+    echo "Setting up MPC server environment..." | log_with_service_name "MPC" $BLUE
+    
+    # Check if MPC directory exists
+    if [ ! -d "$MPC_DIR" ]; then
+        echo "MPC directory not found at $MPC_DIR, attempting to locate it..." | log_with_service_name "MPC" $RED
+        # Try to find the correct directory - limited to searching under PROJECT_ROOT/node
+        POSSIBLE_MPC_DIR=$(find "$PROJECT_ROOT/node" -type d -name "mpc" 2>/dev/null | grep -v "node_modules" | head -n 1)
+        if [ -n "$POSSIBLE_MPC_DIR" ]; then
+            echo "Found possible MPC directory at $POSSIBLE_MPC_DIR" | log_with_service_name "MPC" $BLUE
+            MPC_DIR="$POSSIBLE_MPC_DIR"
+        else
+            echo "Could not find MPC directory. Aborting." | log_with_service_name "MPC" $RED
+            cd "$ORIGINAL_DIR"
+            return 1
+        fi
+    fi
+    
+    echo "Using MPC directory: $MPC_DIR" | log_with_service_name "MPC" $BLUE
+    
+    cd "$MPC_DIR" || {
+        echo "Failed to change to MPC directory: $MPC_DIR" | log_with_service_name "MPC" $RED
+        cd "$ORIGINAL_DIR"
+        return 1
+    }
+    
+    # Create a separate virtual environment for MPC
+    if [ ! -d ".venv" ]; then
+        echo "Creating virtual environment for MPC..." | log_with_service_name "MPC" $BLUE
+        uv venv
+        
+        # Install pip in the MPC virtual environment
+        echo "Installing pip in the virtual environment..." | log_with_service_name "MPC" $BLUE
+        curl -sSL https://bootstrap.pypa.io/get-pip.py | $VENV_PATH/python -
+        
+        # Install dependencies from pyproject.toml
+        echo "Installing MPC dependencies from pyproject.toml..." | log_with_service_name "MPC" $BLUE
+        uv lock
+        uv sync
+    else
+        echo "Virtual environment for MPC already exists." | log_with_service_name "MPC" $BLUE
+    fi
+    
+    # Create startup script for MPC
+    cat > $MPC_DIR/start_mpc.sh << EOF
+#!/bin/bash
+export PYTHONPATH=$PROJECT_ROOT
+cd $MPC_DIR
+exec $VENV_PATH/python $MPC_DIR/server.py --port $MPC_PORT
+EOF
+    
+    chmod +x $MPC_DIR/start_mpc.sh
+
+    # Create launchd plist file
+    cat > ~/Library/LaunchAgents/com.naptha.mpc.plist << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.naptha.mpc</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$MPC_DIR/start_mpc.sh</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>$MPC_DIR</string>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>$VENV_PATH:/usr/local/bin:/usr/bin:/bin</string>
+        <key>PYTHONPATH</key>
+        <string>$PROJECT_ROOT</string>
+    </dict>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/tmp/mpc.log</string>
+    <key>StandardErrorPath</key>
+    <string>/tmp/mpc.log</string>
+</dict>
+</plist>
+EOF
+
+    # Return to original directory
+    cd "$ORIGINAL_DIR"
+
+    # Load and start service
+    launchctl unload ~/Library/LaunchAgents/com.naptha.mpc.plist 2>/dev/null || true
+    launchctl load ~/Library/LaunchAgents/com.naptha.mpc.plist
+
+    # Check if service is running with improved error handling
+    echo "Checking if MPC service is running..." | log_with_service_name "MPC" $BLUE
+    
+    # Try multiple times with increasing wait periods
+    for attempt in 1 2 3; do
+        sleep $((attempt * 2))
+        if pgrep -f "server.py.*$MPC_PORT" > /dev/null; then
+            echo "MPC server started successfully on attempt $attempt." | log_with_service_name "MPC" $GREEN
+            return 0
+        else
+            echo "MPC start attempt $attempt failed, waiting longer..." | log_with_service_name "MPC" $YELLOW
+        fi
+    done
+    
+    # If we reach here, all attempts failed
+    echo "Failed to start MPC server after multiple attempts. Check logs:" | log_with_service_name "MPC" $RED
+    tail -n 50 /tmp/mpc.log
+    return 1
+}
+
 main() {
     print_logo
     load_env_file
@@ -2263,6 +2546,7 @@ main() {
             darwin_start_servers
             darwin_start_celery_worker
             darwin_start_litellm
+            darwin_start_mpc
             startup_summary
         else
             install_python312
@@ -2281,6 +2565,7 @@ main() {
             linux_start_servers
             linux_start_celery_worker
             linux_start_litellm
+            linux_start_mpc
             startup_summary
         fi
     fi
