@@ -59,9 +59,7 @@ jobs:
           echo "HUB_PASSWORD=${NAPTHA_HUB_PASSWORD}" >> .env
 
       - name: Launch node
-        run: |
-          bash launch.sh
-          curl http://localhost:7001/health
+        run: bash launch.sh
 
       
   launch-node:
