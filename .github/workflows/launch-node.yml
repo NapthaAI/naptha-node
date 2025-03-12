@@ -28,7 +28,7 @@ jobs:
           push: false
           platforms: linux/amd64,linux/arm64
           tags: |
-            napthaai/node:latest
+            napthaai/node:foo
             napthaai/node:${{ github.sha }}
 
       - name: Set up env variables
@@ -57,11 +57,11 @@ jobs:
           echo "HUB_USERNAME=${NAPTHA_HUB_USERNAME}" >> .env
           echo "HUB_PASSWORD=${NAPTHA_HUB_PASSWORD}" >> .env
 
-      - name: Install node
+      - name: Launch node
         run: bash launch.sh
 
-      # - name: Check Health
-      #   run: curl -I http://localhost:7001/health
+      - name: Check Health
+        run: curl http://localhost:7001/health
       
   launch-node:
     runs-on: ${{ matrix.os }}
@@ -101,5 +101,5 @@ jobs:
         run: bash launch.sh
 
       - name: Check Health
-        run: curl -I http://localhost:7001/health
+        run: curl http://localhost:7001/health
 
