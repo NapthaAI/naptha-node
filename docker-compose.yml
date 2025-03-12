@@ -90,16 +90,16 @@ services:
     networks:
       - naptha-network
 
-  mpc-server:
-    container_name: mpc-server
+  mcp-server:
+    container_name: mcp-server
     build:
       context: .
-      dockerfile: Dockerfile-mpc
+      dockerfile: Dockerfile-mcp
     env_file:
       - ./.env
     restart: unless-stopped
     ports:
-      - '${MPC_SERVER_PORT:-8000}:8000'
+      - '${MCP_SERVER_PORT:-8000}:8000'
     networks:
       - naptha-network
 

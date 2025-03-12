@@ -1,7 +1,7 @@
 [project]
-name = "naptha-mpc"
+name = "naptha-mcp"
 version = "0.1.0"
-description = "A naptha mcp serverfor naptha node"
+description = "A naptha mcp server for naptha node"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

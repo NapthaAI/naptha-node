@@ -18,9 +18,9 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-class NapthaMPCServer:
+class NapthaMCPServer:
     def __init__(self):
-        self.app = Server("naptha-mpc")
+        self.app = Server("naptha-mcp")
         self.setup_tools()
         self.shutdown_event = asyncio.Event()
         self.shutdown_timeout = 10  # Shutdown timeout in seconds
@@ -144,7 +144,7 @@ class NapthaMPCServer:
         # Store server instance for graceful shutdown
         self.server = server
         
-        logger.info(f"Starting Naptha MPC Server on port {port}")
+        logger.info(f"Starting Naptha MCP Server on port {port}")
         await server.serve()
     
     async def _force_shutdown(self):
@@ -190,8 +190,8 @@ class NapthaMPCServer:
 
 
 async def run_server(port: int):
-    """Main function to run the NapthaMPCServer"""
-    server = NapthaMPCServer()
+    """Main function to run the NapthaMCPServer"""
+    server = NapthaMCPServer()
     
     def signal_handler(sig):
         """Handle shutdown signals"""
@@ -225,7 +225,7 @@ async def run_server(port: int):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Run Naptha MPC Server")
+    parser = argparse.ArgumentParser(description="Run Naptha MCP Server")
     parser.add_argument(
         "--port",
         type=int,

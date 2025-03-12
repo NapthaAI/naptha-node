@@ -1925,18 +1925,18 @@ else:
         fi
     fi
     
-    # Check MPC Server - NEW
-    services+=("MPC_Server")
-    MPC_PORT=${MPC_SERVER_PORT:-8000}
-    if curl -s http://localhost:$MPC_PORT/health > /dev/null; then
+    # Check MCP Server - NEW
+    services+=("MCP_Server")
+    MCP_PORT=${MCP_SERVER_PORT:-8000}
+    if curl -s http://localhost:$MCP_PORT/health > /dev/null; then
         statuses+=("✅")
         logs+=("")
     else
         statuses+=("❌")
         if [ "$os" = "Darwin" ]; then
-            logs+=("$(tail -n 20 /tmp/mpc.log 2>/dev/null || echo 'Log file not found')")
+            logs+=("$(tail -n 20 /tmp/mcp.log 2>/dev/null || echo 'Log file not found')")
         else
-            logs+=("$(sudo journalctl -u mpc -n 20)")
+            logs+=("$(sudo journalctl -u mcp -n 20)")
         fi
     fi
 
@@ -2253,97 +2253,97 @@ EOF
     fi
 }
 
-# Function to start MPC server on Linux
-linux_start_mpc() {
-    echo "Starting MPC server..." | log_with_service_name "MPC" $BLUE
+# Function to start MCP server on Linux
+linux_start_mcp() {
+    echo "Starting MCP server..." | log_with_service_name "MCP" $BLUE
     
     # Get absolute paths and fix current directory issue
     ORIGINAL_DIR=$(pwd)
-    echo "Current directory: $ORIGINAL_DIR" | log_with_service_name "MPC" $BLUE
+    echo "Current directory: $ORIGINAL_DIR" | log_with_service_name "MCP" $BLUE
     
     # If we're inside a nested directory, navigate back to the project root
     if [[ "$ORIGINAL_DIR" == *"/node/inference/litellm"* ]]; then
-        echo "Detected nested directory, navigating back to project root..." | log_with_service_name "MPC" $BLUE
+        echo "Detected nested directory, navigating back to project root..." | log_with_service_name "MCP" $BLUE
         cd "$ORIGINAL_DIR/../../.." # Go back up from /node/inference/litellm to project root
         PROJECT_ROOT=$(pwd)
-        echo "Adjusted to project root: $PROJECT_ROOT" | log_with_service_name "MPC" $BLUE
+        echo "Adjusted to project root: $PROJECT_ROOT" | log_with_service_name "MCP" $BLUE
     else
         PROJECT_ROOT="$ORIGINAL_DIR"
     fi
     
-    MPC_DIR="$PROJECT_ROOT/node/mpc"
-    VENV_PATH="$MPC_DIR/.venv/bin"
-    MPC_PORT=${MPC_SERVER_PORT:-8000}
+    MCP_DIR="$PROJECT_ROOT/node/mcp"
+    VENV_PATH="$MCP_DIR/.venv/bin"
+    MCP_PORT=${MCP_SERVER_PORT:-8000}
     
-    echo "MPC server will run on port $MPC_PORT" | log_with_service_name "MPC" $BLUE
+    echo "MCP server will run on port $MCP_PORT" | log_with_service_name "MCP" $BLUE
     
-    # Create and set up virtual environment for MPC
-    echo "Setting up MPC server environment..." | log_with_service_name "MPC" $BLUE
+    # Create and set up virtual environment for MCP
+    echo "Setting up MCP server environment..." | log_with_service_name "MCP" $BLUE
     
-    # Check if MPC directory exists
-    if [ ! -d "$MPC_DIR" ]; then
-        echo "MPC directory not found at $MPC_DIR, attempting to locate it..." | log_with_service_name "MPC" $RED
+    # Check if MCP directory exists
+    if [ ! -d "$MCP_DIR" ]; then
+        echo "MCP directory not found at $MCP_DIR, attempting to locate it..." | log_with_service_name "MCP" $RED
         # Try to find the correct directory - limited to searching under PROJECT_ROOT/node
-        POSSIBLE_MPC_DIR=$(find "$PROJECT_ROOT/node" -type d -name "mpc" 2>/dev/null | grep -v "node_modules" | head -n 1)
-        if [ -n "$POSSIBLE_MPC_DIR" ]; then
-            echo "Found possible MPC directory at $POSSIBLE_MPC_DIR" | log_with_service_name "MPC" $BLUE
-            MPC_DIR="$POSSIBLE_MPC_DIR"
+        POSSIBLE_MCP_DIR=$(find "$PROJECT_ROOT/node" -type d -name "mcp" 2>/dev/null | grep -v "node_modules" | head -n 1)
+        if [ -n "$POSSIBLE_MCP_DIR" ]; then
+            echo "Found possible MCP directory at $POSSIBLE_MCP_DIR" | log_with_service_name "MCP" $BLUE
+            MCP_DIR="$POSSIBLE_MCP_DIR"
         else
-            echo "Could not find MPC directory. Aborting." | log_with_service_name "MPC" $RED
+            echo "Could not find MCP directory. Aborting." | log_with_service_name "MCP" $RED
             cd "$ORIGINAL_DIR"
             return 1
         fi
     fi
     
-    echo "Using MPC directory: $MPC_DIR" | log_with_service_name "MPC" $BLUE
+    echo "Using MCP directory: $MCP_DIR" | log_with_service_name "MCP" $BLUE
     
-    cd "$MPC_DIR" || {
-        echo "Failed to change to MPC directory: $MPC_DIR" | log_with_service_name "MPC" $RED
+    cd "$MCP_DIR" || {
+        echo "Failed to change to MCP directory: $MCP_DIR" | log_with_service_name "MCP" $RED
         cd "$ORIGINAL_DIR"
         return 1
     }
     
-    # Create a separate virtual environment for MPC
+    # Create a separate virtual environment for MCP
     if [ ! -d ".venv" ]; then
-        echo "Creating virtual environment for MPC..." | log_with_service_name "MPC" $BLUE
+        echo "Creating virtual environment for MCP..." | log_with_service_name "MCP" $BLUE
         uv venv
         
-        # Install pip in the MPC virtual environment
-        echo "Installing pip in the virtual environment..." | log_with_service_name "MPC" $BLUE
+        # Install pip in the MCP virtual environment
+        echo "Installing pip in the virtual environment..." | log_with_service_name "MCP" $BLUE
         curl -sSL https://bootstrap.pypa.io/get-pip.py | $VENV_PATH/python -
         
         # Install dependencies from pyproject.toml
-        echo "Installing MPC dependencies from pyproject.toml..." | log_with_service_name "MPC" $BLUE
+        echo "Installing MCP dependencies from pyproject.toml..." | log_with_service_name "MCP" $BLUE
         uv lock
         uv sync
     else
-        echo "Virtual environment for MPC already exists." | log_with_service_name "MPC" $BLUE
+        echo "Virtual environment for MCP already exists." | log_with_service_name "MCP" $BLUE
     fi
     
-    # Create startup script for MPC
-    cat > $MPC_DIR/start_mpc.sh << EOF
+    # Create startup script for MCP
+    cat > $MCP_DIR/start_mcp.sh << EOF
 #!/bin/bash
 export PYTHONPATH=$PROJECT_ROOT
-cd $MPC_DIR
-exec $VENV_PATH/python $MPC_DIR/server.py --port $MPC_PORT
+cd $MCP_DIR
+exec $VENV_PATH/python $MCP_DIR/server.py --port $MCP_PORT
 EOF
     
-    chmod +x $MPC_DIR/start_mpc.sh
+    chmod +x $MCP_DIR/start_mcp.sh
     
     # Create systemd service file
-    cat > /tmp/mpc.service << EOF
+    cat > /tmp/mcp.service << EOF
 [Unit]
-Description=Naptha MPC Server
+Description=Naptha MCP Server
 After=network.target
 
 [Service]
 Type=simple
 User=$USER
-WorkingDirectory=$MPC_DIR
+WorkingDirectory=$MCP_DIR
 Environment=PATH=$VENV_PATH:/usr/local/bin:/usr/bin:/bin
 Environment=PYTHONPATH=$PROJECT_ROOT
 EnvironmentFile=$PROJECT_ROOT/.env
-ExecStart=$MPC_DIR/start_mpc.sh
+ExecStart=$MCP_DIR/start_mcp.sh
 Restart=always
 RestartSec=3
 TimeoutStopSec=90
@@ -2356,125 +2356,125 @@ WantedBy=multi-user.target
 EOF
 
     # Move service file and start service
-    sudo mv /tmp/mpc.service /etc/systemd/system/
+    sudo mv /tmp/mcp.service /etc/systemd/system/
     sudo systemctl daemon-reload
-    sudo systemctl enable mpc
-    sudo systemctl start mpc
+    sudo systemctl enable mcp
+    sudo systemctl start mcp
     
     # Return to original directory
     cd "$ORIGINAL_DIR"
 
     # Check service status with improved error handling
-    echo "Checking MPC service status..." | log_with_service_name "MPC" $BLUE
+    echo "Checking MCP service status..." | log_with_service_name "MCP" $BLUE
     
     # Check several times with increasing sleep intervals
     for attempt in 1 2 3; do
         sleep $((attempt * 2))
-        if sudo systemctl is-active --quiet mpc; then
-            echo "MPC server started successfully on attempt $attempt." | log_with_service_name "MPC" $GREEN
+        if sudo systemctl is-active --quiet mcp; then
+            echo "MCP server started successfully on attempt $attempt." | log_with_service_name "MCP" $GREEN
             return 0
         else
-            echo "MPC start attempt $attempt failed, waiting longer..." | log_with_service_name "MPC" $YELLOW
+            echo "MCP start attempt $attempt failed, waiting longer..." | log_with_service_name "MCP" $YELLOW
         fi
     done
     
     # If we reach here, all attempts failed
-    echo "Failed to start MPC server after multiple attempts. Checking logs..." | log_with_service_name "MPC" $RED
-    sudo journalctl -u mpc --no-pager -n 50
+    echo "Failed to start MCP server after multiple attempts. Checking logs..." | log_with_service_name "MCP" $RED
+    sudo journalctl -u mcp --no-pager -n 50
     return 1
 }
 
-# Function to start MPC server on macOS
-darwin_start_mpc() {
-    echo "Starting MPC server..." | log_with_service_name "MPC" $BLUE
+# Function to start MCP server on macOS
+darwin_start_mcp() {
+    echo "Starting MCP server..." | log_with_service_name "MCP" $BLUE
     
     # Get absolute paths and fix current directory issue
     ORIGINAL_DIR=$(pwd)
-    echo "Current directory: $ORIGINAL_DIR" | log_with_service_name "MPC" $BLUE
+    echo "Current directory: $ORIGINAL_DIR" | log_with_service_name "MCP" $BLUE
     
     # If we're inside a nested directory, navigate back to the project root
     if [[ "$ORIGINAL_DIR" == *"/node/inference/litellm"* ]]; then
-        echo "Detected nested directory, navigating back to project root..." | log_with_service_name "MPC" $BLUE
+        echo "Detected nested directory, navigating back to project root..." | log_with_service_name "MCP" $BLUE
         cd "$ORIGINAL_DIR/../../.." # Go back up from /node/inference/litellm to project root
         PROJECT_ROOT=$(pwd)
-        echo "Adjusted to project root: $PROJECT_ROOT" | log_with_service_name "MPC" $BLUE
+        echo "Adjusted to project root: $PROJECT_ROOT" | log_with_service_name "MCP" $BLUE
     else
         PROJECT_ROOT="$ORIGINAL_DIR"
     fi
     
-    MPC_DIR="$PROJECT_ROOT/node/mpc"
-    VENV_PATH="$MPC_DIR/.venv/bin"
-    MPC_PORT=${MPC_SERVER_PORT:-8000}
+    MCP_DIR="$PROJECT_ROOT/node/mcp"
+    VENV_PATH="$MCP_DIR/.venv/bin"
+    MCP_PORT=${MCP_SERVER_PORT:-8000}
     
-    echo "MPC server will run on port $MPC_PORT" | log_with_service_name "MPC" $BLUE
+    echo "MCP server will run on port $MCP_PORT" | log_with_service_name "MCP" $BLUE
     
-    # Create and set up virtual environment for MPC
-    echo "Setting up MPC server environment..." | log_with_service_name "MPC" $BLUE
+    # Create and set up virtual environment for MCP
+    echo "Setting up MCP server environment..." | log_with_service_name "MCP" $BLUE
     
-    # Check if MPC directory exists
-    if [ ! -d "$MPC_DIR" ]; then
-        echo "MPC directory not found at $MPC_DIR, attempting to locate it..." | log_with_service_name "MPC" $RED
+    # Check if MCP directory exists
+    if [ ! -d "$MCP_DIR" ]; then
+        echo "MCP directory not found at $MCP_DIR, attempting to locate it..." | log_with_service_name "MCP" $RED
         # Try to find the correct directory - limited to searching under PROJECT_ROOT/node
-        POSSIBLE_MPC_DIR=$(find "$PROJECT_ROOT/node" -type d -name "mpc" 2>/dev/null | grep -v "node_modules" | head -n 1)
-        if [ -n "$POSSIBLE_MPC_DIR" ]; then
-            echo "Found possible MPC directory at $POSSIBLE_MPC_DIR" | log_with_service_name "MPC" $BLUE
-            MPC_DIR="$POSSIBLE_MPC_DIR"
+        POSSIBLE_MCP_DIR=$(find "$PROJECT_ROOT/node" -type d -name "mcp" 2>/dev/null | grep -v "node_modules" | head -n 1)
+        if [ -n "$POSSIBLE_MCP_DIR" ]; then
+            echo "Found possible MCP directory at $POSSIBLE_MCP_DIR" | log_with_service_name "MCP" $BLUE
+            MCP_DIR="$POSSIBLE_MCP_DIR"
         else
-            echo "Could not find MPC directory. Aborting." | log_with_service_name "MPC" $RED
+            echo "Could not find MCP directory. Aborting." | log_with_service_name "MCP" $RED
             cd "$ORIGINAL_DIR"
             return 1
         fi
     fi
     
-    echo "Using MPC directory: $MPC_DIR" | log_with_service_name "MPC" $BLUE
+    echo "Using MCP directory: $MCP_DIR" | log_with_service_name "MCP" $BLUE
     
-    cd "$MPC_DIR" || {
-        echo "Failed to change to MPC directory: $MPC_DIR" | log_with_service_name "MPC" $RED
+    cd "$MCP_DIR" || {
+        echo "Failed to change to MCP directory: $MCP_DIR" | log_with_service_name "MCP" $RED
         cd "$ORIGINAL_DIR"
         return 1
     }
     
-    # Create a separate virtual environment for MPC
+    # Create a separate virtual environment for MCP
     if [ ! -d ".venv" ]; then
-        echo "Creating virtual environment for MPC..." | log_with_service_name "MPC" $BLUE
+        echo "Creating virtual environment for MCP..." | log_with_service_name "MCP" $BLUE
         uv venv
         
-        # Install pip in the MPC virtual environment
-        echo "Installing pip in the virtual environment..." | log_with_service_name "MPC" $BLUE
+        # Install pip in the MCP virtual environment
+        echo "Installing pip in the virtual environment..." | log_with_service_name "MCP" $BLUE
         curl -sSL https://bootstrap.pypa.io/get-pip.py | $VENV_PATH/python -
         
         # Install dependencies from pyproject.toml
-        echo "Installing MPC dependencies from pyproject.toml..." | log_with_service_name "MPC" $BLUE
+        echo "Installing MCP dependencies from pyproject.toml..." | log_with_service_name "MCP" $BLUE
         uv lock
         uv sync
     else
-        echo "Virtual environment for MPC already exists." | log_with_service_name "MPC" $BLUE
+        echo "Virtual environment for MCP already exists." | log_with_service_name "MCP" $BLUE
     fi
     
-    # Create startup script for MPC
-    cat > $MPC_DIR/start_mpc.sh << EOF
+    # Create startup script for MCP
+    cat > $MCP_DIR/start_mcp.sh << EOF
 #!/bin/bash
 export PYTHONPATH=$PROJECT_ROOT
-cd $MPC_DIR
-exec $VENV_PATH/python $MPC_DIR/server.py --port $MPC_PORT
+cd $MCP_DIR
+exec $VENV_PATH/python $MCP_DIR/server.py --port $MCP_PORT
 EOF
     
-    chmod +x $MPC_DIR/start_mpc.sh
+    chmod +x $MCP_DIR/start_mcp.sh
 
     # Create launchd plist file
-    cat > ~/Library/LaunchAgents/com.naptha.mpc.plist << EOF
+    cat > ~/Library/LaunchAgents/com.naptha.mcp.plist << EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.naptha.mpc</string>
+    <string>com.naptha.mcp</string>
     <key>ProgramArguments</key>
     <array>
-        <string>$MPC_DIR/start_mpc.sh</string>
+        <string>$MCP_DIR/start_mcp.sh</string>
     </array>
     <key>WorkingDirectory</key>
-    <string>$MPC_DIR</string>
+    <string>$MCP_DIR</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
@@ -2487,9 +2487,9 @@ EOF
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/tmp/mpc.log</string>
+    <string>/tmp/mcp.log</string>
     <key>StandardErrorPath</key>
-    <string>/tmp/mpc.log</string>
+    <string>/tmp/mcp.log</string>
 </dict>
 </plist>
 EOF
@@ -2498,26 +2498,26 @@ EOF
     cd "$ORIGINAL_DIR"
 
     # Load and start service
-    launchctl unload ~/Library/LaunchAgents/com.naptha.mpc.plist 2>/dev/null || true
-    launchctl load ~/Library/LaunchAgents/com.naptha.mpc.plist
+    launchctl unload ~/Library/LaunchAgents/com.naptha.mcp.plist 2>/dev/null || true
+    launchctl load ~/Library/LaunchAgents/com.naptha.mcp.plist
 
     # Check if service is running with improved error handling
-    echo "Checking if MPC service is running..." | log_with_service_name "MPC" $BLUE
+    echo "Checking if MCP service is running..." | log_with_service_name "MCP" $BLUE
     
     # Try multiple times with increasing wait periods
     for attempt in 1 2 3; do
         sleep $((attempt * 2))
-        if pgrep -f "server.py.*$MPC_PORT" > /dev/null; then
-            echo "MPC server started successfully on attempt $attempt." | log_with_service_name "MPC" $GREEN
+        if pgrep -f "server.py.*$MCP_PORT" > /dev/null; then
+            echo "MCP server started successfully on attempt $attempt." | log_with_service_name "MCP" $GREEN
             return 0
         else
-            echo "MPC start attempt $attempt failed, waiting longer..." | log_with_service_name "MPC" $YELLOW
+            echo "MCP start attempt $attempt failed, waiting longer..." | log_with_service_name "MCP" $YELLOW
         fi
     done
     
     # If we reach here, all attempts failed
-    echo "Failed to start MPC server after multiple attempts. Check logs:" | log_with_service_name "MPC" $RED
-    tail -n 50 /tmp/mpc.log
+    echo "Failed to start MCP server after multiple attempts. Check logs:" | log_with_service_name "MCP" $RED
+    tail -n 50 /tmp/mcp.log
     return 1
 }
 
@@ -2546,7 +2546,7 @@ main() {
             darwin_start_servers
             darwin_start_celery_worker
             darwin_start_litellm
-            darwin_start_mpc
+            darwin_start_mcp
             startup_summary
         else
             install_python312
@@ -2565,7 +2565,7 @@ main() {
             linux_start_servers
             linux_start_celery_worker
             linux_start_litellm
-            linux_start_mpc
+            linux_start_mcp
             startup_summary
         fi
     fi

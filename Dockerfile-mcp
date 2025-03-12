@@ -11,16 +11,16 @@ RUN apt-get install gcc curl git -y
 
 # add conda install to path; use base environment
 ENV PATH="/opt/conda/bin:${PATH}"
-RUN conda create -y -n mpc python=3.12
-RUN echo "source activate mpc" > /root/.bashrc
-ENV PATH="/opt/conda/envs/mpc/bin:$PATH"
+RUN conda create -y -n mcp python=3.12
+RUN echo "source activate mcp" > /root/.bashrc
+ENV PATH="/opt/conda/envs/mcp/bin:$PATH"
 
 # Install uv properly and add to PATH
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.cargo/bin:/root/.local/bin:${PATH}"
 
-# Copy MPC server code - copy to /app directly
-COPY node/mpc .
+# Copy MCP server code - copy to /app directly
+COPY node/mcp .
 
 # Create virtual environment with uv
 RUN uv venv .venv
@@ -36,7 +36,7 @@ RUN . .venv/bin/activate && \
 
 ENV PYTHONPATH=/app
 
-# Expose MPC server port
+# Expose MCP server port
 EXPOSE 8000
 
 # Command to run the server
