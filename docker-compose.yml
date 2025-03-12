@@ -90,6 +90,19 @@ services:
     networks:
       - naptha-network
 
+  mpc-server:
+    container_name: mpc-server
+    build:
+      context: .
+      dockerfile: Dockerfile-mpc
+    env_file:
+      - ./.env
+    restart: unless-stopped
+    ports:
+      - '${MPC_SERVER_PORT:-8000}:8000'
+    networks:
+      - naptha-network
+
 volumes:
   rabbitmq_data: # persist rabbitMQ data e.g. anything durable; users & credentials; configs
   postgres_data:
