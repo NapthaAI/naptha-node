@@ -104,6 +104,29 @@ services:
     networks:
       - naptha-network
 
+  mpc-server:
+    container_name: mpc-server
+    build:
+      context: .
+      dockerfile: Dockerfile-mpc
+    env_file:
+      - ./.env
+    restart: unless-stopped
+    ports:
+      - '${MPC_SERVER_PORT:-8000}:8000'
+    networks:
+      - naptha-network
+    # In development mode, mount the source code for live reloading
+    volumes:
+      - ./node/mpc:/app/node/mpc
+    develop:
+      watch:
+        - action: sync+restart
+          path: ./node/mpc
+          target: /app/node/mpc
+        - action: rebuild
+          path: ./node/mpc/pyproject.toml
+
 volumes:
   rabbitmq_data:
   postgres_data:

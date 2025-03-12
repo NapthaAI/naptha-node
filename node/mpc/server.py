@@ -23,6 +23,7 @@ class NapthaMPCServer:
         self.app = Server("naptha-mpc")
         self.setup_tools()
         self.shutdown_event = asyncio.Event()
+        self.shutdown_timeout = 10  # Shutdown timeout in seconds
         
     async def fetch_website(self, url: str) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
         headers = {
@@ -119,10 +120,15 @@ class NapthaMPCServer:
                     self.app.create_initialization_options(),
                 )
 
+        async def handle_health(request: Request):
+            from starlette.responses import JSONResponse
+            return JSONResponse({"status": "ok"})
+
         return Starlette(
             debug=debug,
             routes=[
                 Route("/sse", endpoint=handle_sse),
+                Route("/health", endpoint=handle_health),
                 Mount("/messages/", app=sse.handle_post_message),
             ],
         )
@@ -141,8 +147,13 @@ class NapthaMPCServer:
         logger.info(f"Starting Naptha MPC Server on port {port}")
         await server.serve()
     
+    async def _force_shutdown(self):
+        """Force shutdown the server after timeout"""
+        logger.warning(f"Forcing shutdown after {self.shutdown_timeout} seconds")
+        os._exit(0)  # Force immediate exit
+        
     async def graceful_shutdown(self, sig=None):
-        """Gracefully shut down the server"""
+        """Gracefully shut down the server with timeout"""
         if sig:
             logger.info(f"Received shutdown signal: {sig}")
         
@@ -151,12 +162,31 @@ class NapthaMPCServer:
         if not self.shutdown_event.is_set():
             self.shutdown_event.set()
             
-            if hasattr(self, 'server') and self.server:
-                self.server.should_exit = True
-                await self.server.shutdown()
-                logger.info("Server stopped")
+            # Start a task that will force exit after timeout
+            force_shutdown_task = asyncio.create_task(
+                asyncio.sleep(self.shutdown_timeout, self._force_shutdown())
+            )
             
-            logger.info("Server shutdown complete")
+            try:
+                if hasattr(self, 'server') and self.server:
+                    logger.info(f"Attempting graceful shutdown (timeout: {self.shutdown_timeout}s)...")
+                    self.server.should_exit = True
+                    await self.server.shutdown()
+                    logger.info("Server stopped gracefully")
+                
+                # If we get here, cancel the force shutdown task
+                force_shutdown_task.cancel()
+                logger.info("Server shutdown complete")
+                
+            except asyncio.CancelledError:
+                # This might happen during forced shutdown
+                logger.warning("Shutdown was cancelled")
+                raise
+            
+            except Exception as e:
+                logger.error(f"Error during shutdown: {e}")
+                logger.error(traceback.format_exc())
+                # Don't cancel force_shutdown_task here, let it exit the process
 
 
 async def run_server(port: int):
