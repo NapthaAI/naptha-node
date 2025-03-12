@@ -17,6 +17,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build node image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile-node
+          push: false
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            napthaai/node:latest
+            napthaai/node:${{ github.sha }}
+
       - name: Set up env variables
         env:
           NAPTHA_HUB_USERNAME: ${{ vars.NAPTHA_HUB_USERNAME }}
