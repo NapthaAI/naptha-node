@@ -140,7 +140,7 @@ wheels = [
 ]
 
 [[package]]
-name = "naptha-mpc"
+name = "naptha-mcp"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
