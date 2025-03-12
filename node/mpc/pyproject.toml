@@ -1,0 +1,16 @@
+[project]
+name = "naptha-mpc"
+version = "0.1.0"
+description = "A naptha mcp serverfor naptha node"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.10.6",
+    "mcp",
+    "httpx>=0.27",
+    "anyio>=4.5"
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
