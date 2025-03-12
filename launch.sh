@@ -2395,7 +2395,7 @@ darwin_start_mpc() {
     # If we're inside a nested directory, navigate back to the project root
     if [[ "$ORIGINAL_DIR" == *"/node/inference/litellm"* ]]; then
         echo "Detected nested directory, navigating back to project root..." | log_with_service_name "MPC" $BLUE
-        cd "$ORIGINAL_DIR/../../../.." # Go back up from /node/inference/litellm to project root
+        cd "$ORIGINAL_DIR/../../.." # Go back up from /node/inference/litellm to project root
         PROJECT_ROOT=$(pwd)
         echo "Adjusted to project root: $PROJECT_ROOT" | log_with_service_name "MPC" $BLUE
     else
