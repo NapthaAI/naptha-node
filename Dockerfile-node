@@ -19,7 +19,7 @@ RUN conda create -y -n node python=3.12
 RUN echo "source activate node" > /root/.bashrc
 ENV PATH="/opt/conda/envs/node/bin:$PATH"
 
-# install postgres (required for poetry to build psycopg2 from source)
+# install postgres (required for building psycopg2 from source)
 RUN conda install -y conda-forge::postgresql=17.2
 ENV LDFLAGS="-L/opt/conda/lib"
 ENV CPPFLAGS="-I/opt/conda/include"
@@ -52,9 +52,9 @@ EXPOSE 7001 7002
 
 # run db migrations / config & server
 CMD set -x && \
-    poetry run python -m node.storage.db.init_db 2>&1 && \
-    poetry run python -m node.storage.hub.init_hub 2>&1 && \
-    poetry run python -m node.storage.hub.init_hub --user 2>&1 && \
-    ((poetry run celery -A node.worker.main:app worker --loglevel=info | tee /dev/stdout) & ) && \
-    ((poetry run python -m node.server.server --communication-protocol http --port 7001) &) && \
-    poetry run python -m node.server.server --communication-protocol ws --port 7002
+    uv run python -m node.storage.db.init_db 2>&1 && \
+    uv run python -m node.storage.hub.init_hub 2>&1 && \
+    uv run python -m node.storage.hub.init_hub --user 2>&1 && \
+    ((uv run celery -A node.worker.main:app worker --loglevel=info | tee /dev/stdout) & ) && \
+    ((uv run python -m node.server.server --communication-protocol http --port 7001) &) && \
+    uv run python -m node.server.server --communication-protocol ws --port 7002
