@@ -24,11 +24,6 @@ RUN conda install -y conda-forge::postgresql=17.2
 ENV LDFLAGS="-L/opt/conda/lib"
 ENV CPPFLAGS="-I/opt/conda/include"
 
-# Install uv using the official installer and find where it's installed
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh
-RUN find / -name uv -type f 2>/dev/null || echo "uv not found"
-RUN find / -name .cargo -type d 2>/dev/null
-
 # Install uv properly and add to PATH
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.cargo/bin:/root/.local/bin:${PATH}"
