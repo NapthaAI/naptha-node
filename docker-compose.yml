@@ -49,7 +49,7 @@ services:
     # can replace this with naptha image once it's published to hub, then we just
     # need to use the .env file UNLESS config.py is modified
     container_name: node-app
-    image: napthaai/node:foo
+    image: napthaai/node:latest
 
     env_file:
       - ./.env
