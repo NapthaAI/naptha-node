@@ -48,11 +48,17 @@ def to_multiaddr(address):
     if address.startswith('/'):
         return address
     
-    # Remove http:// or https:// if present
-    if address.startswith('http://'):
-        address = address[7:]
-    elif address.startswith('https://'):
+    # Initialize protocol and port
+    protocol = "http"
+    default_port = "80"
+    
+    # Extract protocol and determine default port
+    if address.startswith('https://'):
+        protocol = "https"
         address = address[8:]
+        default_port = "443"
+    elif address.startswith('http://'):
+        address = address[7:]
     
     # IP address pattern
     ip_pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
@@ -60,14 +66,12 @@ def to_multiaddr(address):
     # Split host and port
     if ':' in address:
         host, port = address.split(':')
-        # Check if host is IP address
-        if re.match(ip_pattern, host):
-            return f'/ip4/{host}/tcp/{port}'
-        else:
-            return f'/dns/{host}/tcp/{port}'
     else:
-        # Check if address is IP address
-        if re.match(ip_pattern, address):
-            return f'/ip4/{address}'
-        else:
-            return f'/dns/{address}'
+        host = address
+        port = default_port
+    
+    # Check if host is IP address and build the multiaddress
+    if re.match(ip_pattern, host):
+        return f'/ip4/{host}/tcp/{port}/{protocol}'
+    else:
+        return f'/dns/{host}/tcp/{port}/{protocol}'
