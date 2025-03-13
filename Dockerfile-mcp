@@ -37,8 +37,8 @@ RUN . .venv/bin/activate && \
 ENV PYTHONPATH=/app
 
 # Expose MCP server port
-EXPOSE 8000
+EXPOSE 8001
 
 # Command to run the server
 CMD . .venv/bin/activate && \
-    python server.py --port 8000
+    python server.py --port 8001

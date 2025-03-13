@@ -113,12 +113,13 @@ services:
       - ./.env
     restart: unless-stopped
     ports:
-      - '${MCP_SERVER_PORT:-8000}:8000'
+      - '${MCP_SERVER_PORT:-8001}:8001'
     networks:
       - naptha-network
     # In development mode, mount the source code for live reloading
     volumes:
       - ./node/mcp:/app/node/mcp
+      - ./${PRIVATE_KEY}:/app/${PRIVATE_KEY}
     develop:
       watch:
         - action: sync+restart
