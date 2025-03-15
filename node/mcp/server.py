@@ -5,20 +5,27 @@ import traceback
 import logging
 import httpx
 import json
+import argparse
 from pathlib import Path
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 import mcp.types as types
 from starlette.applications import Starlette
 from starlette.routing import Mount, Route
 from starlette.requests import Request
 from mcp.server.lowlevel import Server
 from mcp.server.sse import SseServerTransport
+
+# Import our enhanced client
 from naptha_mcp.client import NapthaMCPClient
 
-file_path = Path(__file__).resolve()
+file_path = Path(__file__).resolve().parent
 project_root = file_path.parent.parent.parent
 
-load_dotenv(project_root / ".env")
+# Load environment variables
+load_dotenv(find_dotenv(), override=True)
+
+# Get MCP server script path from environment
+MCP_SERVER_SCRIPT_PATH = f"{file_path}/naptha_mcp/weather.py"
 
 if os.getenv("LAUNCH_DOCKER") == "false":
     os.environ["NODE_URL"] = "http://localhost:7001"
@@ -91,20 +98,25 @@ class SseServer(Server):
         self.endpoint_path = endpoint_path
 
 class NapthaMCPServer:
-    def __init__(self):
-        # Create two separate server instances for the two endpoints
+    def __init__(self, generic_mcp_script_path=None):
+        # Create server instances for the endpoints
         self.app1 = SseServer("naptha-mcp-sse1", "/sse")
         self.app2 = SseServer("naptha-mcp-sse2", "/sse2")
+        self.app3 = SseServer("naptha-mcp-sse3", "/sse3")
         
-        # Create an instance of the MCP client
+        # Create an instance of the NapthaMCPClient
         self.mcp_client = NapthaMCPClient()
+        
+        # Store the generic MCP script path for later use
+        self.generic_mcp_script_path = generic_mcp_script_path
         
         # Set up the tools for each server
         self.setup_app1()
         self.setup_app2()
+        self.setup_app3()
         
         self.shutdown_event = asyncio.Event()
-        self.shutdown_timeout = 10  # Shutdown timeout in seconds
+        self.shutdown_timeout = 10
         
     async def fetch_website(self, url: str) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
         headers = {
@@ -270,6 +282,67 @@ class NapthaMCPServer:
                 # Return empty list instead of fallback
                 return []
     
+    def setup_app3(self):
+        """Set up tools for /sse3 endpoint with generic MCP server support"""
+        
+        @self.app3.call_tool()
+        async def call_tool3(name: str, arguments: dict) -> list[types.TextContent | types.ImageContent | types.EmbeddedResource]:
+            logger.info(f"App3 tool call: {name}")
+            
+            if not self.generic_mcp_script_path:
+                raise ValueError("Generic MCP script path not provided. Please restart the server with a valid script path.")
+            
+            try:
+                # Create a new client instance for each call to avoid cancel scope issues
+                # This is less efficient but more reliable for the current anyio implementation
+                temp_client = NapthaMCPClient()
+                
+                try:
+                    # Connect to the MCP server
+                    await temp_client.connect_mcp_server(self.generic_mcp_script_path)
+                    
+                    # Call the tool
+                    result = await temp_client.call_mcp_tool(name, arguments)
+                    
+                    # Return the result
+                    return [types.TextContent(type="text", text=result)]
+                finally:
+                    # Always clean up the temporary client
+                    if hasattr(temp_client, "is_mcp_connected") and temp_client.is_mcp_connected:
+                        await temp_client.disconnect_mcp_server()
+                    await temp_client.__aexit__(None, None, None)
+                    
+            except Exception as e:
+                logger.error(f"Error calling tool {name} on generic MCP server: {str(e)}")
+                error_message = f"Error calling tool {name}: {str(e)}"
+                return [types.TextContent(type="text", text=error_message)]
+
+        @self.app3.list_tools()
+        async def list_tools3() -> list[types.Tool]:
+            logger.info("App3 listing tools")
+            
+            if not self.generic_mcp_script_path:
+                logger.warning("Generic MCP script path not provided, no tools will be available")
+                return []
+            
+            try:
+                # Create a new client instance for tool listing to avoid cancel scope issues
+                temp_client = NapthaMCPClient()
+                
+                try:
+                    # Connect to the MCP server
+                    tools = await temp_client.connect_mcp_server(self.generic_mcp_script_path)
+                    return tools
+                finally:
+                    # Always clean up the temporary client
+                    if hasattr(temp_client, "is_mcp_connected") and temp_client.is_mcp_connected:
+                        await temp_client.disconnect_mcp_server()
+                    await temp_client.__aexit__(None, None, None)
+                    
+            except Exception as e:
+                logger.error(f"Error listing tools from generic MCP server: {str(e)}")
+                return []
+    
     def create_starlette_app(self, debug: bool = False) -> Starlette:
         """Create a Starlette application that can serve the provided mcp server with SSE."""
         sse = SseServerTransport("/messages/")
@@ -301,19 +374,56 @@ class NapthaMCPServer:
                     write_stream, 
                     self.app2.create_initialization_options(),
                 )
+        
+        async def handle_sse3(request: Request) -> None:
+            logger.info(f"New connection from /sse3")
+            
+            if not self.generic_mcp_script_path:
+                from starlette.responses import JSONResponse
+                return JSONResponse({"error": "Generic MCP script path not provided"}, status_code=500)
+            
+            async with sse.connect_sse(
+                    request.scope,
+                    request.receive,
+                    request._send,  # noqa: SLF001
+            ) as (read_stream, write_stream):
+                await self.app3.run(
+                    read_stream, 
+                    write_stream, 
+                    self.app3.create_initialization_options(),
+                )
 
         async def handle_health(request: Request):
             from starlette.responses import JSONResponse
-            return JSONResponse({"status": "ok"})
+            status_info = {
+                "status": "ok",
+                "endpoints": {
+                    "sse": True,
+                    "sse2": True,
+                    "sse3": self.generic_mcp_script_path is not None
+                }
+            }
+            
+            # Add MCP server info if connected
+            if hasattr(self.mcp_client, "is_mcp_connected") and self.mcp_client.is_mcp_connected:
+                status_info["mcp_server"] = self.mcp_client.get_mcp_server_info()
+                
+            return JSONResponse(status_info)
+
+        routes = [
+            Route("/sse", endpoint=handle_sse),
+            Route("/sse2", endpoint=handle_sse2),
+            Route("/health", endpoint=handle_health),
+            Mount("/messages/", app=sse.handle_post_message),
+        ]
+        
+        # Add sse3 endpoint only if generic MCP script path is provided
+        if self.generic_mcp_script_path:
+            routes.append(Route("/sse3", endpoint=handle_sse3))
 
         return Starlette(
             debug=debug,
-            routes=[
-                Route("/sse", endpoint=handle_sse),
-                Route("/sse2", endpoint=handle_sse2),
-                Route("/health", endpoint=handle_health),
-                Mount("/messages/", app=sse.handle_post_message),
-            ],
+            routes=routes,
         )
     
     async def start_server(self, port: int, debug: bool = False):
@@ -328,6 +438,13 @@ class NapthaMCPServer:
         self.server = server
         
         logger.info(f"Starting Naptha MCP Server on port {port}")
+        
+        # Log the available endpoints
+        endpoints = ["/sse", "/sse2", "/health"]
+        if self.generic_mcp_script_path:
+            endpoints.append("/sse3")
+        logger.info(f"Available endpoints: {', '.join(endpoints)}")
+        
         await server.serve()
     
     async def _force_shutdown(self):
@@ -342,12 +459,18 @@ class NapthaMCPServer:
         
         logger.info("Shutting down server...")
         
-        # Clean up client if it exists
-        if hasattr(self, 'mcp_client'):
+        # Clean up MCP client
+        if hasattr(self.mcp_client, "is_mcp_connected") and self.mcp_client.is_mcp_connected:
             try:
-                await self.mcp_client.__aexit__(None, None, None)
+                await self.mcp_client.disconnect_mcp_server()
             except Exception as e:
-                logger.error(f"Error cleaning up client: {str(e)}")
+                logger.error(f"Error disconnecting from MCP server: {str(e)}")
+        
+        # Clean up Naptha client
+        try:
+            await self.mcp_client.__aexit__(None, None, None)
+        except Exception as e:
+            logger.error(f"Error cleaning up Naptha client: {str(e)}")
         
         if not self.shutdown_event.is_set():
             self.shutdown_event.set()
@@ -379,9 +502,9 @@ class NapthaMCPServer:
                 # Don't cancel force_shutdown_task here, let it exit the process
 
 
-async def run_server(port: int):
+async def run_server(port: int, generic_mcp_script_path: str = None):
     """Main function to run the NapthaMCPServer"""
-    server = NapthaMCPServer()
+    server = NapthaMCPServer(generic_mcp_script_path)
     
     def signal_handler(sig):
         """Handle shutdown signals"""
@@ -412,8 +535,8 @@ async def run_server(port: int):
             await server.graceful_shutdown()
 
 if __name__ == "__main__":
-    import argparse
-
+    import sys
+    
     parser = argparse.ArgumentParser(description="Run Naptha MCP Server")
     parser.add_argument(
         "--port",
@@ -421,7 +544,31 @@ if __name__ == "__main__":
         default=8000,
         help="Port to run the server on"
     )
+    parser.add_argument(
+        "--generic-mcp-script",
+        type=str,
+        default=MCP_SERVER_SCRIPT_PATH,
+        help="Path to a generic MCP server script (.py or .js) to use with the /sse3 endpoint"
+    )
     
     args = parser.parse_args()
-
-    asyncio.run(run_server(port=args.port))
+    
+    # Get script path from command line or environment
+    script_path = args.generic_mcp_script
+    
+    # Report the source of the script path
+    if script_path:
+        if args.generic_mcp_script == MCP_SERVER_SCRIPT_PATH and MCP_SERVER_SCRIPT_PATH:
+            print(f"Using MCP server script from environment: {script_path}")
+        else:
+            print(f"Using MCP server script from command line: {script_path}")
+            
+        # Validate the script path
+        if not os.path.exists(script_path):
+            print(f"Error: Generic MCP script not found: {script_path}")
+            sys.exit(1)
+    else:
+        print("No generic MCP script provided. The /sse3 endpoint will not be available.")
+        print("Set MCP_SERVER_SCRIPT_PATH environment variable or use --generic-mcp-script option.")
+    
+    asyncio.run(run_server(port=args.port, generic_mcp_script_path=script_path))
