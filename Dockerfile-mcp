@@ -1,0 +1,44 @@
+FROM condaforge/miniforge3:24.9.2-0
+
+WORKDIR /app
+
+# use bash instead of sh
+SHELL ["/bin/bash", "-c"]
+
+# install deps
+RUN apt-get update
+RUN apt-get install gcc curl git -y
+
+# add conda install to path; use base environment
+ENV PATH="/opt/conda/bin:${PATH}"
+RUN conda create -y -n mcp python=3.12
+RUN echo "source activate mcp" > /root/.bashrc
+ENV PATH="/opt/conda/envs/mcp/bin:$PATH"
+
+# Install uv properly and add to PATH
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.cargo/bin:/root/.local/bin:${PATH}"
+
+# Copy MCP server code - copy to /app directly
+COPY node/mcp .
+
+# Create virtual environment with uv
+RUN uv venv .venv
+
+# Install pip explicitly in the virtual environment
+RUN curl -sSL https://bootstrap.pypa.io/get-pip.py -o get-pip.py && \
+    .venv/bin/python get-pip.py && \
+    rm get-pip.py
+
+# Install dependencies from pyproject.toml
+RUN . .venv/bin/activate && \
+    uv pip install -e .
+
+ENV PYTHONPATH=/app
+
+# Expose MCP server port
+EXPOSE 8001
+
+# Command to run the server
+CMD . .venv/bin/activate && \
+    python server.py --port 8001

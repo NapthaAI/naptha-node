@@ -108,6 +108,7 @@ CREATE agent:generate_image_agent SET name="generate_image_agent", description="
 -- TOOLS
 CREATE tool:generate_image_tool SET name="generate_image_tool", description="A simple tool for generating an image from text with Stable Diffusion", parameters="{tool_name: str, tool_input_data: str}", author=user:naptha, module_url="https://github.com/NapthaAI/generate_image_tool", module_type="tool", execution_type="package", module_version="v0.14", module_entrypoint="run.py";
 CREATE tool:image_to_image SET name="image_to_image", description="A simple tool for generating an image from another image with Stable Diffusion", parameters="{prompt: str}", author=user:naptha, module_url="https://github.com/NapthaAI/image2image", module_type="tool", execution_type="package", module_version="v0.9", module_entrypoint="run.py";
+CREATE tool:echo_tool SET name="echo_tool", description="A simple tool for echoing messages", parameters="{func_name: str, func_args: dict}", author=user:naptha, module_url="https://github.com/moarshy/echo_tool", module_type="tool", execution_type="package", module_version="v0.1", module_entrypoint="run.py";
 
 -- ORCHESTRATORS
 CREATE orchestrator:multiagent_chat SET name="multiagent_chat", description="Multi-agent network for chat", parameters="{prompt: str}", author=user:naptha, module_url="https://github.com/NapthaAI/multiagent_chat", module_type="orchestrator", execution_type="package", module_version="v0.19", module_entrypoint="run.py";
