@@ -50,6 +50,6 @@ CMD set -x && \
     uv run python -m node.storage.db.init_db 2>&1 && \
     uv run python -m node.storage.hub.init_hub 2>&1 && \
     uv run python -m node.storage.hub.init_hub --user 2>&1 && \
-    ((uv run celery -A node.worker.main:app worker --loglevel=info | tee /dev/stdout) & ) && \
+    ((uv run celery -A node.worker.main:app worker --loglevel=info --concurrency=120 --max-tasks-per-child=100 --max-memory-per-child=350000 | tee /dev/stdout) & ) && \
     ((uv run python -m node.server.server --communication-protocol http --port 7001) &) && \
     uv run python -m node.server.server --communication-protocol ws --port 7002

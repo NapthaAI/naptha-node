@@ -47,6 +47,6 @@ EXPOSE 7001 7002
 CMD (uv run -m node.storage.db.init_db | tee /dev/stdout) && \
     (uv run -m node.storage.hub.init_hub | tee /dev/stdout) && \
     (uv run -m node.storage.hub.init_hub --user | tee /dev/stdout) && \
-    ((uv run -m celery -A node.worker.main:app worker --loglevel=info | tee /dev/stdout) & ) && \
+    ((uv run -m celery -A node.worker.main:app worker --loglevel=info  --concurrency=120 --max-tasks-per-child=100 --max-memory-per-child=350000 | tee /dev/stdout) & ) && \
     (uv run -m node.server.server --communication-protocol http --port 7001 | tee /dev/stdout) & \
     uv run -m node.server.server --communication-protocol ws --port 7002 | tee /dev/stdout
