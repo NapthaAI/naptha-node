@@ -2187,19 +2187,24 @@ launch_docker() {
 
     # Store compose command base for reuse
     if [[ "$LLM_BACKEND" == "vllm" ]]; then
-        COMPOSE_CMD="env \$(cat .env | grep -v '^#' | xargs) $GPU_ASSIGNMENTS docker compose -f $COMPOSE_BASE_FILE $COMPOSE_FILES"
-        # Start the containers
-        $COMPOSE_CMD up -d
+        # Get environment variables from .env as a string
+        ENV_VARS=$(cat .env | grep -v '^#' | xargs)
+        
+        # Start the containers with environment variables
+        echo "Starting containers in VLLM mode..." | log_with_service_name "Docker" "$BLUE"
+        env $ENV_VARS $GPU_ASSIGNMENTS docker compose -f $COMPOSE_BASE_FILE $COMPOSE_FILES up -d
         
         # Create docker-ctl.sh script for VLLM mode
-        cat > docker-ctl.sh << EOF
+        cat > docker-ctl.sh << 'EOF'
 #!/bin/bash
-case "\$1" in
+case "$1" in
     "down")
-        env \$(cat .env | grep -v '^#' | xargs) $GPU_ASSIGNMENTS docker compose -f $COMPOSE_BASE_FILE $COMPOSE_FILES down
+        ENV_VARS=$(cat .env | grep -v '^#' | xargs)
+        env $ENV_VARS $(cat gpu_assignments.txt) docker compose -f COMPOSE_BASE_FILE COMPOSE_FILES down
         ;;
     "logs")
-        env \$(cat .env | grep -v '^#' | xargs) $GPU_ASSIGNMENTS docker compose -f $COMPOSE_BASE_FILE $COMPOSE_FILES logs -f
+        ENV_VARS=$(cat .env | grep -v '^#' | xargs)
+        env $ENV_VARS $(cat gpu_assignments.txt) docker compose -f COMPOSE_BASE_FILE COMPOSE_FILES logs -f
         ;;
     *)
         echo "Usage: ./docker-ctl.sh [down|logs]"
@@ -2207,10 +2212,12 @@ case "\$1" in
         ;;
 esac
 EOF
+        # Replace placeholders with actual values
+        sed -i "s|COMPOSE_BASE_FILE|$COMPOSE_BASE_FILE|g" docker-ctl.sh
+        sed -i "s|COMPOSE_FILES|$COMPOSE_FILES|g" docker-ctl.sh
     else
-        COMPOSE_CMD="docker compose -f $COMPOSE_BASE_FILE $COMPOSE_FILES"
-        # Start the containers
-        $COMPOSE_CMD up -d
+        echo "Starting containers in Ollama mode..." | log_with_service_name "Docker" "$BLUE"
+        docker compose -f $COMPOSE_BASE_FILE $COMPOSE_FILES up -d
         
         # Create docker-ctl.sh script for Ollama mode
         cat > docker-ctl.sh << EOF
