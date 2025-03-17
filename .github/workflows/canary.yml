@@ -44,7 +44,6 @@ jobs:
           echo "HUB_PASSWORD=${NAPTHA_HUB_PASSWORD}" >> .env
 
       - name: Install SDK dependencies
-        working-directory: $GITHUB_WORKSPACE/sdk-dir
         run: |
           poetry lock
           poetry install
