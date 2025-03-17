@@ -49,6 +49,5 @@ jobs:
           poetry install
       
       - name: Run 
-        working-directory: $GITHUB_WORKSPACE/sdk-dir
         run: |
           poetry run pytest -v tests/test_cli.py
