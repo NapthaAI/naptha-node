@@ -2238,11 +2238,6 @@ EOF
     fi
     
     chmod +x docker-ctl.sh
-    
-    # Clean up temp files
-    if [[ -f "gpu_assignments.txt" ]]; then
-        rm -f gpu_assignments.txt
-    fi
 }
 
 main() {
