@@ -9,13 +9,13 @@ on:
       - main
 
 jobs:
-  tests:
+  sdk-tests:
     runs-on: ubuntu-latest
     environment: development
 
     steps:
       
-      ### Install Naptha node first
+      ### firsty, install Naptha node
 
       - name: Checkout code
         uses: actions/checkout@v4
@@ -46,7 +46,7 @@ jobs:
       - name: Install Poetry for SDK
         uses: snok/install-poetry@v1
       
-      ### Install Naptha SDK second
+      ### secondly, install Naptha SDK
 
       - name: Checkout SDK repo
         uses: actions/checkout@v4
