@@ -56,4 +56,4 @@ jobs:
         env:
           PYTEST_DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          poetry run pytest -v tests/test_cli.py --tb=short
+          poetry run pytest -v tests/test_cli.py --tb=line
