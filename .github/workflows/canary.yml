@@ -50,10 +50,10 @@ jobs:
       
       - name: Install Discord Notification Library
         run: |
-          poetry add pytest-discord
+          poetry add https://github.com/enricorotundo/pytest-discord/releases/download/v0.1.2/pytest_discord-0.1.2-py3-none-any.whl
       
       - name: Run
         env:
           PYTEST_DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
-          poetry run pytest -v tests/test_cli.py --tb=line  --discord-attach-file
+          poetry run pytest -v tests/test_cli.py --tb=no --discord-attach-file
