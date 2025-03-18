@@ -1,104 +1,104 @@
-# name: Install and launch node
+name: Install and launch node
 
-# on:
-#   pull_request:
-#     branches:
-#       - main
-#   push:
-#     branches:
-#       - main
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
 
-# jobs:
-#   launch-node-docker:
-#     runs-on: ubuntu-latest
-#     environment: development
+jobs:
+  launch-node-docker:
+    runs-on: ubuntu-latest
+    environment: development
 
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-#       - name: Set up Docker Buildx
-#         uses: docker/setup-buildx-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-#       - name: Build node image
-#         uses: docker/build-push-action@v5
-#         with:
-#           context: .
-#           file: ./Dockerfile-node
-#           push: false
-#           load: true
-#           platforms: linux/amd64
-#           tags: |
-#             napthaai/node:latest
-#             napthaai/node:${{ github.sha }}
+      - name: Build node image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile-node
+          push: false
+          load: true
+          platforms: linux/amd64
+          tags: |
+            napthaai/node:latest
+            napthaai/node:${{ github.sha }}
 
-#       - name: Set up env variables
-#         env:
-#           NAPTHA_HUB_USERNAME: ${{ vars.NAPTHA_HUB_USERNAME }}
-#           NAPTHA_HUB_PVT_KEY: ${{ secrets.NAPTHA_HUB_PVT_KEY }}
-#           NAPTHA_HUB_PASSWORD: ${{ secrets.NAPTHA_HUB_PASSWORD }}
-#         run: |
-#           cp .env.example .env
+      - name: Set up env variables
+        env:
+          NAPTHA_HUB_USERNAME: ${{ vars.NAPTHA_HUB_USERNAME }}
+          NAPTHA_HUB_PVT_KEY: ${{ secrets.NAPTHA_HUB_PVT_KEY }}
+          NAPTHA_HUB_PASSWORD: ${{ secrets.NAPTHA_HUB_PASSWORD }}
+        run: |
+          cp .env.example .env
 
-#           # override defaults
-#           echo -e "\n" >> .env
-#           echo "LOCAL_HUB=true" >> .env
+          # override defaults
+          echo -e "\n" >> .env
+          echo "LOCAL_HUB=true" >> .env
 
-#           # make sure to launch via docker
-#           echo "LAUNCH_DOCKER=true" >> .env
+          # make sure to launch via docker
+          echo "LAUNCH_DOCKER=true" >> .env
 
-#           # avoid downloading large models
-#           echo "OLLAMA_MODELS=" >> .env
-#           echo "VLLM_MODELS=" >> .env
-#           echo "OPENAI_MODELS=" >> .env
+          # avoid downloading large models
+          echo "OLLAMA_MODELS=" >> .env
+          echo "VLLM_MODELS=" >> .env
+          echo "OPENAI_MODELS=" >> .env
 
-#           # set dummy user
-#           echo "${NAPTHA_HUB_PVT_KEY}" > "${NAPTHA_HUB_USERNAME}.pem"
-#           echo "PRIVATE_KEY=${NAPTHA_HUB_USERNAME}.pem" >> .env
-#           echo "HUB_USERNAME=${NAPTHA_HUB_USERNAME}" >> .env
-#           echo "HUB_PASSWORD=${NAPTHA_HUB_PASSWORD}" >> .env
+          # set dummy user
+          echo "${NAPTHA_HUB_PVT_KEY}" > "${NAPTHA_HUB_USERNAME}.pem"
+          echo "PRIVATE_KEY=${NAPTHA_HUB_USERNAME}.pem" >> .env
+          echo "HUB_USERNAME=${NAPTHA_HUB_USERNAME}" >> .env
+          echo "HUB_PASSWORD=${NAPTHA_HUB_PASSWORD}" >> .env
 
-#       - name: Launch node
-#         run: bash launch.sh
+      - name: Launch node
+        run: bash launch.sh
 
       
-#   launch-node:
-#     runs-on: ${{ matrix.os }}
-#     environment: development
-#     strategy:
-#       matrix:
-#         os: [ubuntu-latest, macos-14]
+  launch-node:
+    runs-on: ${{ matrix.os }}
+    environment: development
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-14]
 
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v4
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-#       - name: Set up env variables
-#         env:
-#           NAPTHA_HUB_USERNAME: ${{ vars.NAPTHA_HUB_USERNAME }}
-#           NAPTHA_HUB_PVT_KEY: ${{ secrets.NAPTHA_HUB_PVT_KEY }}
-#           NAPTHA_HUB_PASSWORD: ${{ secrets.NAPTHA_HUB_PASSWORD }}
-#         run: |
-#           cp .env.example .env
+      - name: Set up env variables
+        env:
+          NAPTHA_HUB_USERNAME: ${{ vars.NAPTHA_HUB_USERNAME }}
+          NAPTHA_HUB_PVT_KEY: ${{ secrets.NAPTHA_HUB_PVT_KEY }}
+          NAPTHA_HUB_PASSWORD: ${{ secrets.NAPTHA_HUB_PASSWORD }}
+        run: |
+          cp .env.example .env
 
-#           # override defaults
-#           echo -e "\n" >> .env
-#           echo "LOCAL_HUB=true" >> .env
+          # override defaults
+          echo -e "\n" >> .env
+          echo "LOCAL_HUB=true" >> .env
 
-#           # avoid downloading large models
-#           echo "OLLAMA_MODELS=" >> .env
-#           echo "VLLM_MODELS=" >> .env
-#           echo "OPENAI_MODELS=" >> .env
+          # avoid downloading large models
+          echo "OLLAMA_MODELS=" >> .env
+          echo "VLLM_MODELS=" >> .env
+          echo "OPENAI_MODELS=" >> .env
 
-#           # set dummy user
-#           echo "${NAPTHA_HUB_PVT_KEY}" > "${NAPTHA_HUB_USERNAME}.pem"
-#           echo "PRIVATE_KEY=${NAPTHA_HUB_USERNAME}.pem" >> .env
-#           echo "HUB_USERNAME=${NAPTHA_HUB_USERNAME}" >> .env
-#           echo "HUB_PASSWORD=${NAPTHA_HUB_PASSWORD}" >> .env
+          # set dummy user
+          echo "${NAPTHA_HUB_PVT_KEY}" > "${NAPTHA_HUB_USERNAME}.pem"
+          echo "PRIVATE_KEY=${NAPTHA_HUB_USERNAME}.pem" >> .env
+          echo "HUB_USERNAME=${NAPTHA_HUB_USERNAME}" >> .env
+          echo "HUB_PASSWORD=${NAPTHA_HUB_PASSWORD}" >> .env
 
-#       - name: Install node
-#         run: bash launch.sh
+      - name: Install node
+        run: bash launch.sh
 
-#       - name: Check Health
-#         run: curl http://localhost:7001/health
+      - name: Check Health
+        run: curl http://localhost:7001/health
 
