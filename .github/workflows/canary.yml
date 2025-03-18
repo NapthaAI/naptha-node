@@ -1,0 +1,60 @@
+name: Canary Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  # TODO delete the targets above
+  schedule:
+  - cron: "0 12 * * *"
+
+jobs:
+  sdk-tests:
+    runs-on: ubuntu-latest
+    environment: development
+
+    steps:
+      
+      - name: Install Poetry for SDK
+        uses: snok/install-poetry@v1
+      
+      - name: Checkout SDK repo
+        uses: actions/checkout@v4
+        with:
+          repository: NapthaAI/naptha-sdk
+          fetch-depth: 1
+
+      - name: Set up SDK env variables
+        env:
+          NAPTHA_HUB_USERNAME: ${{ vars.NAPTHA_HUB_USERNAME }}
+          NAPTHA_HUB_PVT_KEY: ${{ secrets.NAPTHA_HUB_PVT_KEY }}
+          NAPTHA_HUB_PASSWORD: ${{ secrets.NAPTHA_HUB_PASSWORD }}
+        run: |
+          cp .env.example .env
+
+          # override defaults
+          echo -e "\n" >> .env
+
+          # set dummy user
+          echo "${NAPTHA_HUB_PVT_KEY}" > "${NAPTHA_HUB_USERNAME}.pem"
+          echo "PRIVATE_KEY=${NAPTHA_HUB_USERNAME}.pem" >> .env
+          echo "HUB_USERNAME=${NAPTHA_HUB_USERNAME}" >> .env
+          echo "HUB_PASSWORD=${NAPTHA_HUB_PASSWORD}" >> .env
+
+      - name: Install SDK dependencies
+        run: |
+          poetry lock
+          poetry install
+      
+      - name: Install Discord Notification Library
+        run: |
+          poetry add https://github.com/enricorotundo/pytest-discord/releases/download/v0.1.2/pytest_discord-0.1.2-py3-none-any.whl
+      
+      - name: Run
+        env:
+          PYTEST_DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        run: |
+          poetry run pytest -v tests/test_cli.py --tb=no --discord-attach-file
