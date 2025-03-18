@@ -51,3 +51,10 @@ jobs:
       - name: Run 
         run: |
           poetry run pytest -v tests/test_cli.py
+      
+      - name: Discord notification
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+        uses: Ilshidur/action-discord@master
+        with:
+          args: 'This is a Test Message - The project {{ EVENT_PAYLOAD.repository.full_name }} has been deployed.'
