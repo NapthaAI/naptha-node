@@ -48,13 +48,12 @@ jobs:
           poetry lock
           poetry install
       
-      - name: Run 
+      - name: Install Discord Notification Library
+        run: |
+          poetry add pytest-discord
+      
+      - name: Run
+        env:
+          PYTEST_DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           poetry run pytest -v tests/test_cli.py
-      
-      - name: Discord notification
-        env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
-        uses: Ilshidur/action-discord@master
-        with:
-          args: 'This is a Test Message - The project {{ EVENT_PAYLOAD.repository.full_name }} has been deployed.'
