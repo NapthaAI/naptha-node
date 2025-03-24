@@ -90,6 +90,20 @@ services:
     networks:
       - naptha-network
 
+  mcp-server:
+    container_name: mcp-server
+    build:
+      context: .
+      dockerfile: Dockerfile-mcp
+    env_file:
+      - ./.env
+    restart: unless-stopped
+    ports:
+      - '${MCP_SERVER_PORT:-8001}:8001'
+    networks:
+      - naptha-network
+    volumes:
+      - ./${PRIVATE_KEY}:/app/${PRIVATE_KEY}
 volumes:
   rabbitmq_data: # persist rabbitMQ data e.g. anything durable; users & credentials; configs
   postgres_data:

@@ -43,6 +43,12 @@ if [ "$os" = "Darwin" ]; then
         echo "Stopping LiteLLM..."
         launchctl unload ~/Library/LaunchAgents/com.litellm.proxy.plist
     fi
+    
+    # Stop MCP
+    if launchctl list | grep -q "com.naptha.mcp"; then
+        echo "Stopping MCP server..."
+        launchctl unload ~/Library/LaunchAgents/com.naptha.mcp.plist
+    fi
 
     launchctl unload $LAUNCH_AGENTS_PATH/com.example.ollama.plist
     brew services stop rabbitmq
@@ -55,6 +61,7 @@ if [ "$os" = "Darwin" ]; then
         rm $LAUNCH_AGENTS_PATH/com.example.nodeapp.${node_communication_protocol}_${current_port}.plist
     done
     rm $LAUNCH_AGENTS_PATH/com.litellm.proxy.plist
+    rm ~/Library/LaunchAgents/com.naptha.mcp.plist
     rm $LAUNCH_AGENTS_PATH/com.example.ollama.plist
 
     # Stop SurrealDB
@@ -120,6 +127,7 @@ else
     done
     
     stop_service litellm.service
+    stop_service mcp.service
     stop_service ollama.service
     stop_service rabbitmq-server.service
 
@@ -135,6 +143,7 @@ else
         sudo systemctl disable "nodeapp_${node_communication_protocol}_${current_port}.service"
     done
     sudo systemctl disable litellm.service
+    sudo systemctl disable mcp.service
     sudo systemctl disable ollama.service
     sudo systemctl disable rabbitmq-server.service
 
@@ -147,6 +156,7 @@ else
         sudo rm -f "/etc/systemd/system/nodeapp_${node_communication_protocol}_${current_port}.service"
     done
     sudo rm -f /etc/systemd/system/litellm.service
+    sudo rm -f /etc/systemd/system/mcp.service
     sudo rm -f /etc/systemd/system/ollama.service
     sudo rm -f /etc/systemd/system/rabbitmq-server.service
 
@@ -165,6 +175,7 @@ else
     echo "Cleaning up any remaining processes..."
     # Find and kill any remaining Python processes related to the servers
     pkill -f "server/server.py"
+    pkill -f "node/mcp/server.py"
     pkill -f "celery"
     
     echo "All services stopped and systemd files removed."
