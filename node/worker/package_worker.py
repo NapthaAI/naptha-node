@@ -13,7 +13,8 @@ import traceback
 from datetime import datetime
 from dotenv import load_dotenv, dotenv_values
 from typing import Union
-import sys
+import subprocess
+import tempfile
 
 from node.module_manager import install_module_with_lock, load_and_validate_input_schema
 from node.schemas import AgentRun, MemoryRun, ToolRun, EnvironmentRun, OrchestratorRun, KBRun
@@ -37,90 +38,77 @@ if MODULES_SOURCE_DIR not in sys.path:
     sys.path.append(MODULES_SOURCE_DIR)
 
 @app.task(bind=True, acks_late=True)
-def run_agent(self, agent_run, user_env_data = {}):
+def run_agent(self, agent_run, user_env_data={}):
     try:
         agent_run = AgentRun(**agent_run)
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(_run_module_async(agent_run, user_env_data))
     finally:
-        # Force cleanup of channels
         app.backend.cleanup()
 
 @app.task(bind=True, acks_late=True)
-def run_memory(self, memory_run, user_env_data = {}):
+def run_memory(self, memory_run, user_env_data={}):
     try:
         memory_run = MemoryRun(**memory_run)
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(_run_module_async(memory_run, user_env_data))
     finally:
-        # Force cleanup of channels
         app.backend.cleanup()
 
 @app.task(bind=True, acks_late=True)
-def run_tool(self, tool_run, user_env_data = {}):
+def run_tool(self, tool_run, user_env_data={}):
     try:
         tool_run = ToolRun(**tool_run)
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(_run_module_async(tool_run, user_env_data))
     finally:
-        # Force cleanup of channels
         app.backend.cleanup()
 
 @app.task(bind=True, acks_late=True)
-def run_orchestrator(self, orchestrator_run, user_env_data = {}):
+def run_orchestrator(self, orchestrator_run, user_env_data={}):
     try:
         orchestrator_run = OrchestratorRun(**orchestrator_run)
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(_run_module_async(orchestrator_run, user_env_data))
     finally:
-        # Force cleanup of channels
         app.backend.cleanup()
 
 @app.task(bind=True, acks_late=True)
-def run_environment(self, environment_run, user_env_data = {}):
+def run_environment(self, environment_run, user_env_data={}):
     try:
         environment_run = EnvironmentRun(**environment_run)
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(_run_module_async(environment_run, user_env_data))
     finally:
-        # Force cleanup of channels
         app.backend.cleanup()
 
 @app.task(bind=True, acks_late=True)
-def run_kb(self, kb_run, user_env_data = {}):
+def run_kb(self, kb_run, user_env_data={}):
     try:
         kb_run = KBRun(**kb_run)
         loop = asyncio.get_event_loop()
         return loop.run_until_complete(_run_module_async(kb_run, user_env_data))
     finally:
-        # Force cleanup of channels
         app.backend.cleanup()
 
-async def _run_module_async(module_run: Union[AgentRun, MemoryRun, ToolRun, OrchestratorRun, EnvironmentRun, KBRun], user_env_data = {}) -> None:
-    """Handles execution of agent, memory, orchestrator, and environment runs.
-    
-    Args:
-        module_run: Either an AgentRun, MemoryRun, OrchestratorRun, or EnvironmentRun object
-    """
+async def _run_module_async(module_run: Union[AgentRun, MemoryRun, ToolRun, OrchestratorRun, EnvironmentRun, KBRun], user_env_data={}) -> None:
     try:
         module_run_engine = ModuleRunEngine(module_run)
-
         module_version = f"v{module_run_engine.module['module_version']}"
         module_name = module_run_engine.module["name"]
         module = module_run.deployment.module
 
         logger.info(f"Received {module_run_engine.module_type} run: {module_run} - Checking if {module_run_engine.module_type} {module_name} version {module_version} is installed")
-
-        try:
-            await install_module_with_lock(module)
-        except Exception as e:
-            error_msg = (f"Failed to install or verify {module_run_engine.module_type} {module_name}: {str(e)}")
-            logger.error(error_msg)
-            logger.error(f"Traceback: {traceback.format_exc()}")
-            if "Dependency conflict detected" in str(e):
-                logger.error("This error is likely due to a mismatch in naptha-sdk versions. Please check and align the versions in both the agent and the main project.")
-            await handle_failure(error_msg=error_msg, module_run=module_run)
-            return
+        # try:
+        #     await install_module_with_lock(module)
+        # except Exception as e:
+        #     error_msg = f"Failed to install or verify {module_run_engine.module_type} {module_name}: {str(e)}"
+        #     logger.error(error_msg)
+        #     logger.error(f"Traceback: {traceback.format_exc()}")
+        #     if "Dependency conflict detected" in str(e):
+        #         logger.error("This error is likely due to a mismatch in naptha-sdk versions. Please check and align the versions in both the agent and the main project.")
+        #     await handle_failure(error_msg=error_msg, module_run=module_run)
+        #     return
 
         await module_run_engine.init_run()
         await module_run_engine.start_run(user_env_data)
@@ -137,22 +125,11 @@ async def _run_module_async(module_run: Union[AgentRun, MemoryRun, ToolRun, Orch
         await handle_failure(error_msg=error_msg, module_run=module_run)
         return
 
-async def handle_failure(
-    error_msg: str, 
-    module_run: Union[AgentRun, OrchestratorRun, EnvironmentRun]
-) -> None:
-    """Handle failure for any type of module run.
-    
-    Args:
-        error_msg: Error message to store
-        module_run: Module run object (AgentRun, OrchestratorRun, or EnvironmentRun)
-    """
+async def handle_failure(error_msg: str, module_run: Union[AgentRun, OrchestratorRun, EnvironmentRun]) -> None:
     module_run.status = "error"
-    module_run.error = True 
+    module_run.error = True
     module_run.error_message = error_msg
     module_run.completed_time = datetime.now(pytz.utc).isoformat()
-
-    # Calculate duration if possible
     if hasattr(module_run, "start_processing_time") and module_run.start_processing_time:
         module_run.duration = (
             datetime.fromisoformat(module_run.completed_time)
@@ -160,7 +137,6 @@ async def handle_failure(
         ).total_seconds()
     else:
         module_run.duration = 0
-
     try:
         await update_db_with_status_sync(module_run=module_run)
     except Exception as db_error:
@@ -168,14 +144,10 @@ async def handle_failure(
 
 async def maybe_async_call(func, *args, **kwargs):
     if inspect.iscoroutinefunction(func):
-        # If it's an async function, await it directly
         return await func(*args, **kwargs)
     else:
-        # If it's a sync function, run it in an executor to avoid blocking the event loop
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(
-            None, functools.partial(func, *args, **kwargs)
-        )
+        return await loop.run_in_executor(None, functools.partial(func, *args, **kwargs))
 
 class ModuleLoader:
     def __init__(self, module_name: str, venv_path: str, module_dir: Path):
@@ -187,99 +159,108 @@ class ModuleLoader:
 
     @contextmanager
     def package_context(self, env_vars):
-        """Temporarily modify sys.path and working directory for package imports"""
         dot_env_vars = dotenv_values(os.path.join(os.path.dirname(__file__), '../../.env'))
         old_env = os.environ.copy()
-
         try:
             self.original_sys_path = sys.path.copy()
             self.original_cwd = os.getcwd()
-            
-            # Change working directory to module directory
             os.chdir(str(self.module_dir))
-            
-            # Add both site-packages and module root directory to path
-            # UV uses a slightly different structure for virtual environments
             venv_site_packages = os.path.join(
-                self.venv_path, 
-                'lib', 
+                self.venv_path,
+                'lib',
                 f'python{sys.version_info.major}.{sys.version_info.minor}',
                 'site-packages'
             )
-            
-            # Ensure module directory is first in path
             if str(self.module_dir) in sys.path:
                 sys.path.remove(str(self.module_dir))
             if str(venv_site_packages) in sys.path:
                 sys.path.remove(str(venv_site_packages))
-                
             sys.path.insert(0, str(self.module_dir))
             sys.path.insert(1, str(venv_site_packages))
-
-            # Remove env data from .env and add user env data
             for key in dot_env_vars:
                 if key in os.environ:
                     os.environ[key] = ""
-
             if env_vars:
                 os.environ.update(env_vars)
-            
             logger.debug(f"Modified sys.path: {sys.path[:2]}")
             logger.debug(f"Current working directory: {os.getcwd()}")
-            logger.debug(f"Injected user env data")
-            
+            logger.debug("Injected user env data")
             yield
-            
         finally:
             if self.original_sys_path:
                 sys.path = self.original_sys_path
             if self.original_cwd:
                 os.chdir(self.original_cwd)
-
             os.environ.clear()
             os.environ.update(old_env)
 
-    async def load_and_run(self, module_path: Path, entrypoint: str, module_run, user_env_data = {}):
-        with self.package_context(user_env_data):
-            try:
-                # Remove any existing module references
-                for key in list(sys.modules.keys()):
-                    if key.startswith(self.module_name):
-                        del sys.modules[key]
+    def _load_and_run_subprocess(self, module_path: Path, entrypoint: str, module_run, user_env_data={}):
+        # Convert module_run to a JSON-serializable dict if it's a pydantic BaseModel
+        if hasattr(module_run, "model_dump"):
+            module_run_data = module_run.model_dump()
+        elif hasattr(module_run, "dict"):
+            module_run_data = module_run.dict()
+        else:
+            module_run_data = module_run
 
-                # Import the run module directly first
-                spec = util.spec_from_file_location(
-                    f"{self.module_name}.run", 
-                    str(module_path)
-                )
-                if not spec or not spec.loader:
-                    raise ImportError(f"Could not load module spec from {module_path}")
-                
-                module = util.module_from_spec(spec)
-                sys.modules[f"{self.module_name}.run"] = module
-                spec.loader.exec_module(module)
+        with tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False) as tmp:
+            json.dump(module_run_data, tmp)
+            tmp.flush()
+            tmp_name = tmp.name
 
-                # Get and execute the entrypoint function
-                run_func = getattr(module, entrypoint)
-                
-                # Convert module_run to dict if it's a pydantic model
-                if hasattr(module_run, 'model_dump'):
-                    module_run_dict = module_run.model_dump()
-                else:
-                    module_run_dict = module_run
-                
-                if inspect.iscoroutinefunction(run_func):
-                    result = await run_func(module_run=module_run_dict)
-                else:
-                    result = await maybe_async_call(run_func, module_run=module_run_dict)
-                
-                return result
+        # Create environment for subprocess and update it with user_env_data
+        env = os.environ.copy()
+        env.update(user_env_data)
+        venv_site_packages = os.path.join(
+            self.venv_path,
+            'lib',
+            f'python{sys.version_info.major}.{sys.version_info.minor}',
+            'site-packages'
+        )
+        env['PYTHONPATH'] = f"{self.module_dir}{os.pathsep}{venv_site_packages}{os.pathsep}{env.get('PYTHONPATH', '')}"
 
-            except Exception as e:
-                logger.error(f"Module import paths: {sys.path[:2]}")
-                logger.error(f"Current working directory: {os.getcwd()}")
-                logger.error(f"Module directory contents: {list(Path(os.getcwd()).glob('*'))}")
-                raise RuntimeError(f"Module execution failed: {str(e)}") from e
+        # Use a multi-line inline code string to ensure proper formatting and error handling.
+        inline_code = (
+            "import sys, json, inspect, asyncio, logging\n"
+            "logging.disable(logging.CRITICAL)\n"
+            "try:\n"
+            "    from {module_name}.run import {entrypoint}\n"
+            "except Exception as e:\n"
+            "    sys.exit(json.dumps({{'error': 'Import failed: ' + str(e)}}))\n"
+            "try:\n"
+            "    data = json.load(open(sys.argv[1]))\n"
+            "except Exception as e:\n"
+            "    sys.exit(json.dumps({{'error': 'JSON load failed: ' + str(e)}}))\n"
+            "try:\n"
+            "    result = {entrypoint}(data)\n"
+            "    if inspect.iscoroutine(result):\n"
+            "        result = asyncio.run(result)\n"
+            "except Exception as e:\n"
+            "    result = {{'error': str(e)}}\n"
+            "sys.stdout.write(json.dumps(result))\n"
+            "sys.stdout.flush()\n"
+        ).format(module_name=self.module_name, entrypoint=entrypoint)
+
+        venv_python = os.path.join(self.venv_path, 'bin', 'python')
+        python_executable = venv_python if os.path.exists(venv_python) else sys.executable
+
+        cmd = [python_executable, "-c", inline_code, tmp_name]
+        try:
+            result = subprocess.run(cmd, env=env, capture_output=True, text=True, check=True)
+            return result.stdout.strip()
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Subprocess module execution failed: {e.stderr}")
+
+    async def load_and_run(self, module_path: Path, entrypoint: str, module_run, user_env_data={}):
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None,
+            self._load_and_run_subprocess,
+            module_path,
+            entrypoint,
+            module_run,
+            user_env_data
+        )
 
 class ModuleRunEngine:
     def __init__(self, module_run: Union[AgentRun, MemoryRun, ToolRun, EnvironmentRun, KBRun]):
@@ -287,11 +268,9 @@ class ModuleRunEngine:
         self.deployment = module_run.deployment
         self.module = self.deployment.module
         self.module_type = module_run.deployment.module['module_type']
-
         self.module_name = self.module["name"]
         self.module_version = f"v{self.module['module_version']}"
         self.parameters = module_run.inputs
-
         self.consumer = {
             "public_key": module_run.consumer_id.split(":")[1],
             "id": module_run.consumer_id,
@@ -301,75 +280,54 @@ class ModuleRunEngine:
         logger.info(f"Initializing {self.module_type} run")
         self.module_run.status = "processing"
         self.module_run.start_processing_time = datetime.now(pytz.timezone("UTC")).isoformat()
-
         await update_db_with_status_sync(module_run=self.module_run)
-
         if "input_dir" in self.parameters or "input_ipfs_hash" in self.parameters:
             self.parameters = prepare_input_dir(
                 parameters=self.parameters,
                 input_dir=self.parameters.get("input_dir", None),
                 input_ipfs_hash=self.parameters.get("input_ipfs_hash", None),
             )
-
-        # Load the module
         self.module_run = await load_and_validate_input_schema(self.module_run)
 
-    async def start_run(self, env_data = {}):
-        """Executes the module run"""
+    async def start_run(self, env_data={}):
         logger.info(f"Starting {self.module_type} run")
+        logger.info(f"Env data: {env_data}")
         self.module_run.status = "running"
         await update_db_with_status_sync(module_run=self.module_run)
-
         try:
-            # Setup paths
             modules_source_dir = Path(MODULES_SOURCE_DIR) / self.module_name
             module_dir = modules_source_dir  
             venv_dir = module_dir / ".venv"
             module_path = module_dir / self.module_name / "run.py"
-            
-            # Log package structure
-            logger.info(f"Checking module structure...")
+            logger.info("Checking module structure...")
             logger.debug(f"__init__.py exists: {(module_dir / self.module_name / '__init__.py').exists()}")
             logger.debug(f"schemas.py exists: {(module_dir / self.module_name / 'schemas.py').exists()}")
             logger.debug(f"Module directory contents: {list((module_dir / self.module_name).glob('*'))}")
-
-            # Get entrypoint name
             entrypoint = self.module['module_entrypoint'].split('.')[0] if 'module_entrypoint' in self.module else 'run'
-            
-            # Initialize loader with module directory
             loader = ModuleLoader(self.module_name, str(venv_dir), module_dir)
-            
-            # Run module
             response = await loader.load_and_run(
                 module_path=module_path,
                 entrypoint=entrypoint,
                 module_run=self.module_run,
                 user_env_data=env_data
             )
-            
-            # Handle response
             if isinstance(response, str):
                 self.module_run.results = [response]
             else:
                 self.module_run.results = [json.dumps(response)]
-                
             if self.module_type == "agent":
                 await self.handle_output(self.module_run, response)
-                
             self.module_run.status = "completed"
-
         except Exception as e:
             logger.error(f"Error running {self.module_type}: {e}")
             logger.error(f"Traceback: {traceback.format_exc()}")
             raise
 
     async def handle_output(self, module_run, results):
-        """Handles the output of the module run (only for agent and tool runs)"""
         if module_run.deployment.data_generation_config:
             save_location = module_run.deployment.data_generation_config.save_outputs_location
             if save_location:
                 module_run.deployment.data_generation_config.save_outputs_location = save_location
-
             if module_run.deployment.data_generation_config.save_outputs:
                 if save_location == "node":
                     if ':' in module_run.id:
@@ -387,7 +345,6 @@ class ModuleRunEngine:
                     self.module_run.results = [out_msg]
 
     async def complete(self):
-        """Marks the module run as completed"""
         self.module_run.status = "completed"
         self.module_run.error = False
         self.module_run.error_message = ""
@@ -400,7 +357,6 @@ class ModuleRunEngine:
         logger.info(f"{self.module_type.title()} run completed")
 
     async def fail(self):
-        """Marks the module run as failed"""
         logger.error(f"Error running {self.module_type}")
         error_details = traceback.format_exc()
         logger.error(f"Traceback: {error_details}")
